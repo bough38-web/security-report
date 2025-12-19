@@ -1,0 +1,37 @@
+name: Daily News Crawl
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 매일 자정(UTC) 실행 = 한국시간 오전 9시
+  workflow_dispatch:      # 수동 실행 버튼 활성화
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v3
+
+      - name: 파이썬 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: 라이브러리 설치
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: 크롤링 스크립트 실행
+        run: |
+          python app.py
+
+      - name: 결과물(HTML) 저장 및 업데이트
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "actions@github.com"
+          git add index.html
+          git commit -m "Auto-update dashboard data" || echo "No changes to commit"
+          git push
