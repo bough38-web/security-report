@@ -1,358 +1,332 @@
-import requests
-from bs4 import BeautifulSoup
 import json
 import datetime
-import base64
+import random
 import os
+import base64
+import time
 
-# ---------------------------------------------------------
-# [1] 설정 및 크롤링 로직 (네이버 뉴스)
-# ---------------------------------------------------------
+# --- [설정] ---
 KEYWORDS = ["KT텔레캅", "SK쉴더스", "에스원", "보안 사고", "해킹", "개인정보 유출", "산업 재해"]
 OUTPUT_FILENAME = "index.html"
 
-def get_risk_level(title):
-    """제목을 분석하여 위험도 판별"""
+# --- [1] 라이브러리 로드 ---
+try:
+    import requests
+    from bs4 import BeautifulSoup
+    HAS_LIBS = True
+    print("✅ 라이브러리 감지됨: 실시간 크롤링을 시도합니다.")
+except ImportError:
+    HAS_LIBS = False
+    print("⚠️ 라이브러리 없음: '테스트 데이터 모드'로 작동합니다.")
+
+# --- [2] 위험도 분석 ---
+def get_risk(title):
     t = title.lower()
-    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌']): 
+    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌', '적발']):
         return 'RED'
-    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상']): 
+    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상']):
         return 'AMBER'
     return 'GREEN'
 
-def crawl_naver_news():
-    print("🕷️ 실시간 크롤링 시작...")
+# --- [3] 데이터 수집 (크롤링 + 안전장치) ---
+def get_data():
+    if not HAS_LIBS:
+        return get_dummy_data("라이브러리 미설치 (테스트)")
+
+    print("🕷️ 크롤링 시작...")
     results = []
-    # 봇 차단 방지 헤더
+    # 봇 차단 우회 헤더
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
     }
-    
+
     for kw in KEYWORDS:
         try:
-            print(f"   - 검색 중: {kw}")
             url = f"https://search.naver.com/search.naver?where=news&query={kw}&sort=1"
             res = requests.get(url, headers=headers, timeout=5)
-            soup = BeautifulSoup(res.text, "html.parser")
             
-            # 뉴스 아이템 추출 (최신 3개)
+            if res.status_code != 200:
+                continue
+
+            soup = BeautifulSoup(res.text, "html.parser")
             items = soup.select("a.news_tit")
+
             for item in items[:3]:
                 title = item.get_text()
                 link = item['href']
-                
-                # 링크 유효성 체크
                 if not link.startswith("http"): link = "#"
-
+                
                 results.append({
                     "keyword": kw,
                     "title": title,
                     "link": link,
                     "date": datetime.datetime.now().strftime("%Y-%m-%d"),
-                    "risk": get_risk_level(title)
+                    "risk": get_risk(title)
                 })
+            time.sleep(0.2) # 차단 방지
         except Exception as e:
-            print(f"   ⚠️ 에러 ({kw}): {e}")
-            pass
-            
+            print(f"⚠️ {kw} 수집 중 에러: {e}")
+    
+    if not results:
+        return get_dummy_data("크롤링 데이터 없음 (차단됨)")
+        
     return results
 
-# ---------------------------------------------------------
-# [2] 데이터 처리 및 암호화 (★ 깨짐 방지 핵심 ★)
-# ---------------------------------------------------------
-# 1. 크롤링 실행
-crawled_data = crawl_naver_news()
+def get_dummy_data(reason):
+    print(f"🚑 {reason} -> 샘플 데이터를 생성합니다.")
+    return [{"keyword": k, "title": f"[{k}] 보안 이슈 모니터링 (샘플 데이터)", "link": "#", "date": "2025-01-01", "risk": "GREEN"} for k in KEYWORDS]
 
-# 2. 데이터가 없으면 비상용 데이터 생성
-if not crawled_data:
-    print("🚑 데이터 없음 -> 샘플 데이터 생성")
-    crawled_data = [{"keyword": "시스템", "title": "수집된 뉴스가 없습니다 (샘플)", "link": "#", "date": "-", "risk": "GREEN"}]
+# --- [4] 데이터 암호화 (핵심: 깨짐 방지) ---
+final_data = get_data()
 
-# 3. Base64로 인코딩 (HTML 내에서 문자열 충돌 방지)
-json_str = json.dumps(crawled_data, ensure_ascii=False)
-b64_data = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+# 1. 한글을 포함한 모든 문자를 ASCII 코드로 변환 (ensure_ascii=True)
+#    이렇게 하면 한글이 \uXXXX 형태로 변해서 절대 깨지지 않습니다.
+json_str = json.dumps(final_data, ensure_ascii=True)
+kw_str = json.dumps(KEYWORDS, ensure_ascii=True)
 
-# 키워드 리스트도 인코딩
-kw_str = json.dumps(KEYWORDS, ensure_ascii=False)
-b64_kw = base64.b64encode(kw_str.encode('utf-8')).decode('utf-8')
+# 2. Base64로 인코딩
+b64_data = base64.b64encode(json_str.encode('ascii')).decode('ascii')
+b64_kw = base64.b64encode(kw_str.encode('ascii')).decode('ascii')
 
-print(f"✅ 총 {len(crawled_data)}건 데이터 처리 완료.")
+print(f"✅ 데이터 준비 완료 ({len(final_data)}건). HTML 생성 중...")
 
-# ---------------------------------------------------------
-# [3] HTML 템플릿 (Base64 디코딩 로직 포함)
-# ---------------------------------------------------------
-html_template = """
-<!DOCTYPE html>
+# --- [5] HTML 템플릿 (가장 호환성 높은 코드) ---
+html = f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Insight Pro</title>
+    <title>Security Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #334155; }
-        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
-        .glass-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-        
-        /* 뱃지 스타일 */
-        .badge { padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
-        .badge-RED { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
-        .badge-AMBER { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
-        .badge-GREEN { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-        
-        /* 로딩 애니메이션 */
-        #loader { position: fixed; inset: 0; background: white; z-index: 99; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        body {{ font-family: sans-serif; background-color: #f1f5f9; }}
+        .card {{ background: white; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }}
+        .card:hover {{ transform: translateY(-2px); transition: 0.2s; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }}
     </style>
 </head>
-<body>
+<body class="text-slate-800">
 
-    <div id="loader">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-slate-500 font-bold">실시간 분석 중...</p>
+    <div id="loader" class="fixed inset-0 bg-white z-50 flex flex-col justify-center items-center">
+        <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <p class="font-bold text-slate-500">데이터 로딩 중...</p>
     </div>
 
-    <nav class="bg-slate-900 text-white h-14 sticky top-0 z-50 px-6 flex items-center justify-between shadow-lg">
-        <div class="flex items-center gap-2 font-bold text-lg">
+    <nav class="bg-slate-900 text-white h-16 flex items-center px-6 justify-between shadow-lg sticky top-0 z-40">
+        <div class="font-bold text-xl flex items-center gap-2">
             <i class="ph-fill ph-shield-check text-blue-400"></i> AI Security Watch
         </div>
-        <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700">
-            Live Crawling
-        </div>
+        <span class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300">Live</span>
     </nav>
 
     <div class="max-w-7xl mx-auto p-6 space-y-6">
         
-        <div class="glass-card p-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
-            <h2 class="font-bold text-lg mb-2 flex items-center gap-2"><i class="ph-duotone ph-brain"></i> AI Risk Summary</h2>
-            <p id="ai-msg" class="text-sm text-slate-300 bg-white/10 p-3 rounded-lg backdrop-blur-sm">데이터 분석 중...</p>
-            <div id="quick-btns" class="mt-4 flex flex-wrap gap-2"></div>
+        <div class="card p-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
+            <h2 class="font-bold text-lg mb-2 flex items-center gap-2"><i class="ph-duotone ph-robot"></i> AI Risk Analysis</h2>
+            <p id="summary-text" class="text-sm text-slate-300 bg-white/10 p-3 rounded mb-4">분석 중...</p>
+            <div id="btn-container" class="flex flex-wrap gap-2"></div>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="glass-card p-5 border-l-4 border-blue-500">
-                <p class="text-xs text-slate-500 font-bold uppercase">Total</p>
-                <h3 id="kpi-total" class="text-3xl font-bold text-slate-800 mt-1">-</h3>
+            <div class="card p-5 border-l-4 border-blue-500">
+                <p class="text-xs font-bold text-slate-500">TOTAL</p>
+                <h3 id="kpi-total" class="text-2xl font-bold">-</h3>
             </div>
-            <div class="glass-card p-5 border-l-4 border-red-500 bg-red-50/10">
-                <p class="text-xs text-red-600 font-bold uppercase">Critical</p>
-                <h3 id="kpi-red" class="text-3xl font-bold text-red-600 mt-1">-</h3>
+            <div class="card p-5 border-l-4 border-red-500">
+                <p class="text-xs font-bold text-red-500">CRITICAL</p>
+                <h3 id="kpi-red" class="text-2xl font-bold text-red-600">-</h3>
             </div>
-            <div class="glass-card p-5 border-l-4 border-amber-500">
-                <p class="text-xs text-amber-600 font-bold uppercase">Warning</p>
-                <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-1">-</h3>
+            <div class="card p-5 border-l-4 border-amber-500">
+                <p class="text-xs font-bold text-amber-500">WARNING</p>
+                <h3 id="kpi-amber" class="text-2xl font-bold text-amber-600">-</h3>
             </div>
-            <div class="glass-card p-5 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold uppercase">Keyword</p>
-                <h3 id="kpi-kw" class="text-xl font-bold text-green-700 mt-2 truncate">-</h3>
+            <div class="card p-5 border-l-4 border-green-500">
+                <p class="text-xs font-bold text-green-500">KEYWORD</p>
+                <h3 id="kpi-keyword" class="text-lg font-bold text-green-600 truncate">-</h3>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="space-y-6">
-                <div class="glass-card p-5 sticky top-20">
-                    <h3 class="font-bold text-sm text-slate-700 mb-3 border-b pb-2">Control Panel</h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">키워드 필터</label>
-                            <select id="sel-kw" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none focus:border-blue-500"><option value="all">전체 보기</option></select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">실시간 검색</label>
-                            <input id="inp-search" type="text" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none focus:border-blue-500" placeholder="제목 검색...">
-                        </div>
-                    </div>
+                <div class="card p-5 sticky top-20">
+                    <h3 class="font-bold text-sm mb-3">검색 필터</h3>
+                    <input id="search-input" type="text" class="w-full border p-2 rounded text-sm mb-3 outline-none focus:border-blue-500" placeholder="제목 검색...">
+                    <select id="keyword-select" class="w-full border p-2 rounded text-sm outline-none"><option value="all">전체 키워드</option></select>
                 </div>
-                <div class="glass-card p-5">
-                    <h3 class="font-bold text-sm text-slate-700 mb-3">Risk Distribution</h3>
-                    <div class="h-48 relative"><canvas id="chart"></canvas></div>
+                <div class="card p-5">
+                    <h3 class="font-bold text-sm mb-3">리스크 분포</h3>
+                    <div class="h-48"><canvas id="myChart"></canvas></div>
                 </div>
             </div>
 
             <div class="lg:col-span-2">
-                <div class="flex justify-between items-end mb-3 px-1">
-                    <h3 class="font-bold text-lg text-slate-800">News Feed</h3>
-                    <span id="cnt" class="text-xs font-bold bg-white border px-2 py-1 rounded text-slate-500 shadow-sm">0건</span>
+                <div class="flex justify-between items-end mb-3">
+                    <h3 class="font-bold text-lg">뉴스 피드</h3>
+                    <span id="list-count" class="text-xs font-bold bg-white px-2 py-1 rounded border">0건</span>
                 </div>
-                <div id="list" class="space-y-3"></div>
+                <div id="news-list" class="space-y-3"></div>
             </div>
         </div>
         
-        <footer class="mt-12 py-8 text-center text-xs text-slate-400 border-t">
+        <footer class="mt-12 text-center text-xs text-slate-400 py-6 border-t">
             &copy; 2025 AI Security Watch. Auto-Generated.
         </footer>
     </div>
 
     <script>
-        // ★★★ 핵심: Base64로 인코딩된 데이터를 받습니다 (절대 깨지지 않음) ★★★
-        const B64_DATA = "__DATA_B64__";
-        const B64_KW = "__KW_B64__";
-
-        // Base64 디코딩 함수 (한글 완벽 지원)
-        function decodeBase64(str) {
-            try {
-                const binString = atob(str);
-                const bytes = Uint8Array.from(binString, m => m.codePointAt(0));
-                return JSON.parse(new TextDecoder().decode(bytes));
-            } catch (e) {
-                console.error("Data Decode Error:", e);
-                return [];
-            }
-        }
+        // ★★★ 여기가 핵심입니다 ★★★
+        // 한글 깨짐 방지를 위해 Base64로 인코딩된 데이터를 받아서, 브라우저가 직접 풉니다.
+        const RAW_DATA_B64 = "{b64_data}";
+        const KEYWORDS_B64 = "{b64_kw}";
 
         let rawData = [];
         let keywords = [];
-        let filtered = [];
-        let myChart = null;
+        let filteredData = [];
+        let chartInstance = null;
 
-        // 초기화 실행
-        window.onload = () => {
-            rawData = decodeBase64(B64_DATA);
-            keywords = decodeBase64(B64_KW);
-            filtered = [...rawData];
+        window.onload = function() {{
+            try {{
+                // 1. 데이터 디코딩 (atob는 Base64를 풉니다)
+                rawData = JSON.parse(atob(RAW_DATA_B64));
+                keywords = JSON.parse(atob(KEYWORDS_B64));
+                filteredData = [...rawData];
 
-            // 로딩 화면 제거
-            setTimeout(() => {
+                // 2. 초기화 실행
+                init();
+                
+                // 3. 로딩 제거
                 document.getElementById('loader').style.display = 'none';
-            }, 500);
+            }} catch (e) {{
+                alert("데이터 로딩 중 오류가 발생했습니다: " + e.message);
+                document.getElementById('loader').style.display = 'none';
+            }}
+        }};
 
-            initDashboard();
-        };
+        function init() {{
+            // 버튼 생성
+            const btnContainer = document.getElementById('btn-container');
+            const select = document.getElementById('keyword-select');
 
-        function initDashboard() {
-            const btnArea = document.getElementById('quick-btns');
-            const sel = document.getElementById('sel-kw');
-
-            // 키워드 버튼 및 셀렉트 생성
-            keywords.forEach(k => {
+            keywords.forEach(k => {{
+                // 셀렉트 옵션
                 const opt = document.createElement('option');
                 opt.value = k; opt.textContent = k;
-                sel.appendChild(opt);
+                select.appendChild(opt);
 
+                // 버튼
                 const btn = document.createElement('button');
-                btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-blue-500 hover:text-white transition-colors border border-slate-600";
+                btn.className = "px-3 py-1 bg-slate-700 hover:bg-blue-600 text-white rounded text-xs transition-colors";
                 btn.textContent = k;
-                btn.onclick = () => { sel.value = k; update(); };
-                btnArea.appendChild(btn);
-            });
+                btn.onclick = () => {{ select.value = k; update(); }};
+                btnContainer.appendChild(btn);
+            }});
 
             update();
-        }
+        }}
 
-        function update() {
-            const kw = document.getElementById('sel-kw').value;
-            const search = document.getElementById('inp-search').value.toLowerCase();
+        function update() {{
+            const kw = document.getElementById('keyword-select').value;
+            const search = document.getElementById('search-input').value.toLowerCase();
 
-            filtered = rawData.filter(d => {
-                return (kw === 'all' || d.keyword === kw) && d.title.toLowerCase().includes(search);
-            });
+            filteredData = rawData.filter(item => {{
+                const matchKw = kw === 'all' || item.keyword === kw;
+                const matchSearch = item.title.toLowerCase().includes(search);
+                return matchKw && matchSearch;
+            }});
 
             render();
-        }
+        }}
 
-        function render() {
-            // 1. KPI
-            document.getElementById('kpi-total').textContent = filtered.length;
-            const red = filtered.filter(d => d.risk === 'RED').length;
-            document.getElementById('kpi-red').textContent = red;
-            document.getElementById('kpi-amber').textContent = filtered.filter(d => d.risk === 'AMBER').length;
+        function render() {{
+            // KPI
+            document.getElementById('kpi-total').textContent = filteredData.length;
+            const redCount = filteredData.filter(d => d.risk === 'RED').length;
+            document.getElementById('kpi-red').textContent = redCount;
+            document.getElementById('kpi-amber').textContent = filteredData.filter(d => d.risk === 'AMBER').length;
+            
+            if (filteredData.length > 0) {{
+                const counts = {{}};
+                filteredData.forEach(d => counts[d.keyword] = (counts[d.keyword]||0)+1);
+                document.getElementById('kpi-keyword').textContent = Object.keys(counts).reduce((a,b)=>counts[a]>counts[b]?a:b);
+            }} else {{
+                document.getElementById('kpi-keyword').textContent = "-";
+            }}
 
-            if (filtered.length > 0) {
-                const c = {};
-                filtered.forEach(d => c[d.keyword] = (c[d.keyword] || 0) + 1);
-                const top = Object.keys(c).reduce((a, b) => c[a] > c[b] ? a : b);
-                document.getElementById('kpi-kw').textContent = top;
-            } else {
-                document.getElementById('kpi-kw').textContent = "-";
-            }
+            // 요약
+            const summary = document.getElementById('summary-text');
+            if (redCount > 0) {{
+                summary.innerHTML = `현재 <span class="text-red-400 font-bold">심각(Critical) 이슈가 ${{redCount}}건</span> 발견되었습니다. 리스트를 확인하세요.`;
+            }} else {{
+                summary.innerHTML = "분석 결과, 특이한 보안 위협 징후는 발견되지 않았습니다. (안전)";
+            }}
 
-            // 2. AI Summary
-            const msg = document.getElementById('ai-msg');
-            if (red > 0) {
-                msg.innerHTML = `현재 <span class="text-red-400 font-bold">심각(Critical) 이슈가 ${red}건</span> 감지되었습니다. 리스트를 확인하세요.`;
-            } else {
-                msg.innerHTML = `분석 결과, 현재 특이한 보안 위협 징후는 발견되지 않았습니다. (안전 상태)`;
-            }
-
-            // 3. List Rendering
-            const list = document.getElementById('list');
+            // 리스트
+            const list = document.getElementById('news-list');
             list.innerHTML = '';
-            document.getElementById('cnt').textContent = `${filtered.length}건`;
+            document.getElementById('list-count').textContent = filteredData.length + "건";
 
-            if (filtered.length === 0) {
-                list.innerHTML = '<div class="p-8 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-400">데이터 없음</div>';
-            } else {
-                filtered.forEach(d => {
+            if (filteredData.length === 0) {{
+                list.innerHTML = '<div class="p-8 text-center border rounded text-slate-400">데이터가 없습니다.</div>';
+            }} else {{
+                filteredData.forEach(d => {{
                     const el = document.createElement('a');
                     el.href = d.link; el.target = "_blank";
-                    el.className = "block glass-card p-5 group no-underline relative hover:border-blue-400 transition-all";
-                    const badge = `badge-${d.risk}`;
+                    el.className = "block card p-4 group no-underline";
+                    
+                    let badgeColor = "bg-green-100 text-green-700 border-green-200";
+                    if(d.risk === "RED") badgeColor = "bg-red-100 text-red-700 border-red-200";
+                    if(d.risk === "AMBER") badgeColor = "bg-amber-100 text-amber-700 border-amber-200";
+
                     el.innerHTML = `
                         <div class="flex justify-between items-start gap-4">
-                            <div class="flex-1">
+                            <div>
                                 <div class="flex gap-2 mb-2 items-center flex-wrap">
-                                    <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase ${badge}">${d.risk}</span>
-                                    <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 font-bold">${d.keyword}</span>
-                                    <span class="text-xs text-slate-400 font-mono">${d.date}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${{badgeColor}}">${{d.risk}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border">${{d.keyword}}</span>
+                                    <span class="text-xs text-slate-400 font-mono">${{d.date}}</span>
                                 </div>
-                                <div class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors">
-                                    ${d.title}
-                                </div>
+                                <h4 class="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">${{d.title}}</h4>
                             </div>
-                            <i class="ph-bold ph-arrow-square-out text-slate-300 text-lg group-hover:text-blue-500"></i>
+                            <i class="ph-bold ph-arrow-square-out text-slate-300 group-hover:text-blue-500"></i>
                         </div>
                     `;
                     list.appendChild(el);
-                });
-            }
+                }});
+            }}
 
-            // 4. Chart Rendering
-            if (myChart) myChart.destroy();
-            const counts = { RED: 0, AMBER: 0, GREEN: 0 };
-            filtered.forEach(d => {
-                if (counts[d.risk] !== undefined) counts[d.risk]++;
-                else counts.GREEN++;
-            });
+            // 차트
+            if(chartInstance) chartInstance.destroy();
+            const rCounts = {{RED:0, AMBER:0, GREEN:0}};
+            filteredData.forEach(d => {{
+                if(rCounts[d.risk] !== undefined) rCounts[d.risk]++;
+                else rCounts.GREEN++;
+            }});
 
-            const ctx = document.getElementById('chart');
-            myChart = new Chart(ctx, {
+            const ctx = document.getElementById('myChart');
+            chartInstance = new Chart(ctx, {{
                 type: 'doughnut',
-                data: {
+                data: {{
                     labels: ['Critical', 'Warning', 'Safe'],
-                    datasets: [{
-                        data: [counts.RED, counts.AMBER, counts.GREEN],
+                    datasets: [{{
+                        data: [rCounts.RED, rCounts.AMBER, rCounts.GREEN],
                         backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
                         borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '75%',
-                    plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8 } } }
-                }
-            });
-        }
-        
-        // 이벤트 리스너
-        document.getElementById('sel-kw').addEventListener('change', update);
-        document.getElementById('inp-search').addEventListener('input', update);
+                    }}]
+                }},
+                options: {{ cutout: '75%', plugins: {{ legend: {{ position: 'right', labels: {{ usePointStyle: true, boxWidth: 8 }} }} }} }}
+            }});
+        }}
+
+        document.getElementById('keyword-select').addEventListener('change', update);
+        document.getElementById('search-input').addEventListener('input', update);
     </script>
 </body>
 </html>
 """
 
-# ---------------------------------------------------------
-# [4] 데이터 주입 및 파일 저장
-# ---------------------------------------------------------
-# Base64 데이터를 HTML의 약속된 위치(__DATA_B64__)에 교체
-final_html = html_template.replace("__DATA_B64__", b64_data)
-final_html = final_html.replace("__KW_B64__", b64_kw)
-
-with open(OUTPUT_FILENAME, "w", encoding="utf-8") as f:
-    f.write(final_html)
+# --- [6] 파일 저장 ---
+with open(OUTPUT_FILENAME, 'w', encoding='utf-8') as f:
+    f.write(html)
 
 print(f"✨ 생성 완료: {OUTPUT_FILENAME}")
-print("   (Base64 인코딩이 적용되어 깨짐 현상이 완전히 해결되었습니다.)")
