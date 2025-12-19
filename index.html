@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Security Watch</title>
+    <title>Security Insight Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; color: #1e293b; }
-        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.2s; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.2s; }
         .glass-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
         #loader { position: fixed; inset: 0; background: white; z-index: 99; display: flex; flex-direction: column; justify-content: center; align-items: center; }
     </style>
@@ -20,15 +20,15 @@
 
     <div id="loader">
         <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p class="text-slate-500 font-bold">구글 뉴스 분석 중...</p>
+        <p class="text-slate-500 font-bold">보안 데이터 로딩 중...</p>
     </div>
 
     <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 px-6 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-2 font-bold text-lg">
-            <i class="ph-fill ph-globe-hemisphere-west text-blue-400"></i> Global Security Watch
+            <i class="ph-fill ph-shield-check text-blue-400"></i> Security Insight Pro
         </div>
         <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center gap-2">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Google News Live
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Dual-Engine Crawling
         </div>
     </nav>
 
@@ -58,7 +58,7 @@
                 <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</h3>
             </div>
             <div class="glass-card p-5 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold uppercase">Key Issue</p>
+                <p class="text-xs text-green-600 font-bold uppercase">Main Issue</p>
                 <h3 id="kpi-kw" class="text-lg font-bold text-green-700 mt-3 truncate">-</h3>
             </div>
         </div>
@@ -66,30 +66,27 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="space-y-6">
                 <div class="glass-card p-5 sticky top-24">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4 pb-2 border-b">Dashboard Control</h3>
+                    <h3 class="font-bold text-sm text-slate-700 mb-4 pb-2 border-b">Control Panel</h3>
                     <div class="space-y-4">
                         <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">Filter by Keyword</label>
-                            <select id="sel-kw" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 cursor-pointer"><option value="all">View All</option></select>
+                            <label class="text-xs font-bold text-slate-500 block mb-1">Keyword Filter</label>
+                            <select id="sel-kw" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 cursor-pointer"><option value="all">전체 보기</option></select>
                         </div>
                         <div>
                             <label class="text-xs font-bold text-slate-500 block mb-1">Search</label>
-                            <div class="relative">
-                                <i class="ph-bold ph-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
-                                <input id="inp-search" type="text" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="키워드 검색...">
-                            </div>
+                            <input id="inp-search" type="text" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="제목 검색...">
                         </div>
                     </div>
                 </div>
                 <div class="glass-card p-5">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4">Risk Distribution</h3>
+                    <h3 class="font-bold text-sm text-slate-700 mb-4">Risk Share</h3>
                     <div class="h-48 relative"><canvas id="chart"></canvas></div>
                 </div>
             </div>
 
             <div class="lg:col-span-2">
                 <div class="flex justify-between items-end mb-4 px-1">
-                    <h3 class="font-bold text-lg text-slate-800">Latest Feed</h3>
+                    <h3 class="font-bold text-lg text-slate-800">News Feed</h3>
                     <span id="cnt" class="text-xs font-bold bg-white border px-2 py-1 rounded text-slate-500 shadow-sm">0 items</span>
                 </div>
                 <div id="list" class="space-y-3"></div>
@@ -97,16 +94,15 @@
         </div>
         
         <footer class="mt-12 py-8 text-center text-xs text-slate-400 border-t">
-            &copy; 2025 Global Security Watch. Powered by Google News RSS.
+            &copy; 2025 Security Insight Pro. Powered by Hybrid Crawler.
         </footer>
     </div>
 
     <script>
-        // ★ Base64 디코딩 (깨짐 방지 기술) ★
-        const B64_DATA = "W3sia2V5d29yZCI6ICLsi5zsiqTthZwiLCAidGl0bGUiOiAi6rWs6riAIOuJtOyKpCDsl7DqsrAg7Iuk7YyoICjsg5jtlIwg642w7J207YSwKSIsICJsaW5rIjogIiMiLCAiZGF0ZSI6ICItIiwgInJpc2siOiAiR1JFRU4ifV0=";
+        // ★★★ Base64 데이터 디코딩 (깨짐 방지) ★★★
+        const B64_DATA = "W3sia2V5d29yZCI6ICLsi5zsiqTthZwiLCAidGl0bGUiOiAi7ZiE7J6sIOyImOynkSDqsIDriqXtlZwg64m07Iqk6rCAIOyXhuqxsOuCmCDsoJHsho3snbQg7LCo64uo65CY7JeI7Iq164uI64ukLiIsICJsaW5rIjogIiMiLCAiZGF0ZSI6ICIyMDI1LTEyLTE5IiwgInJpc2siOiAiUkVEIn1d";
         const B64_KW = "WyJLVO2FlOugiOy6hSIsICJTS+yJtOuNlOyKpCIsICLsl5DsiqTsm5AiLCAi67O07JWIIOyCrOqzoCIsICLtlbTtgrkiLCAi6rCc7J247KCV67O0IOycoOy2nCIsICLsgrDsl4Ug7J6s7ZW0Il0=";
         
-        // 유니코드 지원 디코더
         function decodeData(str) {
             try {
                 return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.codePointAt(0))));
@@ -220,7 +216,7 @@
             filtered.forEach(d => {
                 if(counts[d.risk]!==undefined) counts[d.risk]++;
                 else counts.GREEN++;
-            });
+            }});
 
             const ctx = document.getElementById('chart');
             myChart = new Chart(ctx, {
