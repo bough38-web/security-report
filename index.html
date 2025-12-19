@@ -1,117 +1,121 @@
-import csv, json
-
-input_filename = "data.csv"
-output_filename = "index.html"
-
-news_data = []
-
-try:
-    with open(input_filename, mode="r", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames:
-            reader.fieldnames = [h.strip() for h in reader.fieldnames]
-
-        for row in reader:
-            title = row.get("title", "").strip()
-            if not title:
-                continue
-
-            link = row.get("link", "").strip()
-            if link and not link.startswith("http") and link != "#":
-                link = "https://" + link
-            if not link:
-                link = "#"
-
-            date = row.get("date_fmt", "").strip() or row.get("date", "").strip()
-            risk = row.get("risk", "GREEN").strip().upper()
-            if risk not in ["RED", "AMBER", "GREEN"]:
-                risk = "GREEN"
-
-            news_data.append({
-                "keyword": row.get("keyword", "").strip(),
-                "title": title,
-                "link": link,
-                "date": date,
-                "risk": risk
-            })
-except FileNotFoundError:
-    pass
-
-json_payload = json.dumps(news_data, ensure_ascii=False)
-
-html = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Security Insight</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body class="bg-slate-50">
+
+<body class="bg-slate-50 text-slate-800">
+
+<nav class="bg-slate-900 text-white px-6 h-14 flex items-center justify-between">
+  <span class="font-bold">Security Insight</span>
+  <span class="text-xs bg-slate-800 px-2 py-1 rounded">Live Dashboard</span>
+</nav>
 
 <div class="max-w-7xl mx-auto p-6">
-  <div class="bg-slate-900 text-white rounded-xl p-6 mb-6">
-    <h2 class="text-lg font-bold mb-2">AI 인사이트</h2>
-    <p>
-      현재 <strong>__COUNT__건</strong>의 데이터가 로드되었습니다.
-      <span class="text-red-400 font-bold">RED</span> 이슈는 즉시 확인하세요.
-    </p>
+
+  <!-- AI 인사이트 -->
+  <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl p-6 mb-6">
+    <h2 class="font-bold text-lg mb-2">AI 인사이트</h2>
+    <p id="summary">데이터 로딩 중...</p>
   </div>
 
+  <!-- KPI -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="bg-white p-4 rounded border">
-      <p>Total</p><p id="kpi-total">-</p>
+      <p class="text-xs">Total</p><p id="kpi-total" class="text-2xl font-bold">-</p>
     </div>
     <div class="bg-white p-4 rounded border text-red-600">
-      <p>Critical</p><p id="kpi-red">-</p>
+      <p class="text-xs">Critical</p><p id="kpi-red" class="text-2xl font-bold">-</p>
     </div>
     <div class="bg-white p-4 rounded border text-amber-600">
-      <p>Warning</p><p id="kpi-amber">-</p>
+      <p class="text-xs">Warning</p><p id="kpi-amber" class="text-2xl font-bold">-</p>
     </div>
     <div class="bg-white p-4 rounded border text-green-600">
-      <p>Top Keyword</p><p id="kpi-keyword">-</p>
+      <p class="text-xs">Top Keyword</p><p id="kpi-keyword" class="font-bold">-</p>
     </div>
   </div>
 
-  <div id="news-list" class="space-y-3"></div>
+  <!-- 차트 + 리스트 -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="bg-white p-4 rounded border">
+      <h3 class="font-bold mb-2">Risk Share</h3>
+      <canvas id="riskChart" height="200"></canvas>
+    </div>
+    <div class="lg:col-span-2">
+      <h3 class="font-bold mb-4">뉴스 피드</h3>
+      <div id="news-list" class="space-y-3"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
-const rawData = __DATA__;
+fetch("data.csv")
+  .then(res => res.text())
+  .then(text => {
+    const lines = text.split("\n").filter(l => l.trim());
+    const headers = lines[0].split(",").map(h => h.trim());
 
-document.getElementById("kpi-total").textContent = rawData.length;
-document.getElementById("kpi-red").textContent = rawData.filter(d=>d.risk==="RED").length;
-document.getElementById("kpi-amber").textContent = rawData.filter(d=>d.risk==="AMBER").length;
+    const data = lines.slice(1).map(line => {
+      const values = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+      const obj = {};
+      headers.forEach((h,i)=> obj[h] = (values[i]||"").replace(/"/g,"").trim());
+      return obj;
+    });
 
-if(rawData.length){
-  const c={};
-  rawData.forEach(d=>c[d.keyword]=(c[d.keyword]||0)+1);
-  document.getElementById("kpi-keyword").textContent =
-    Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
+    render(data);
+  })
+  .catch(err => {
+    document.getElementById("summary").textContent = "CSV 로딩 실패";
+    console.error(err);
+  });
+
+function render(data){
+  document.getElementById("summary").innerHTML =
+    `현재 <strong>${data.length}건</strong>의 데이터가 로드되었습니다.`;
+
+  document.getElementById("kpi-total").textContent = data.length;
+  document.getElementById("kpi-red").textContent = data.filter(d=>d.risk==="RED").length;
+  document.getElementById("kpi-amber").textContent = data.filter(d=>d.risk==="AMBER").length;
+
+  const kwCount = {};
+  data.forEach(d => kwCount[d.keyword] = (kwCount[d.keyword]||0)+1);
+  const topKw = Object.entries(kwCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || "-";
+  document.getElementById("kpi-keyword").textContent = topKw;
+
+  // 리스트
+  const list = document.getElementById("news-list");
+  list.innerHTML = "";
+  data.forEach(d => {
+    const el = document.createElement("a");
+    el.href = d.link || "#";
+    el.target = "_blank";
+    el.className = "block bg-white border rounded p-4 hover:shadow";
+    el.innerHTML = `
+      <div class="text-xs mb-1">${d.keyword} · ${d.date_fmt || d.date} · ${d.risk}</div>
+      <div class="font-bold">${d.title}</div>
+    `;
+    list.appendChild(el);
+  });
+
+  // 차트
+  const c = {RED:0, AMBER:0, GREEN:0};
+  data.forEach(d => c[d.risk] = (c[d.risk]||0)+1);
+
+  new Chart(document.getElementById("riskChart"), {
+    type:"doughnut",
+    data:{
+      labels:["RED","AMBER","GREEN"],
+      datasets:[{data:[c.RED,c.AMBER,c.GREEN],backgroundColor:["#ef4444","#f59e0b","#22c55e"]}]
+    },
+    options:{cutout:"70%"}
+  });
 }
-
-const list=document.getElementById("news-list");
-rawData.forEach(item=>{
-  const el=document.createElement("a");
-  el.href=item.link;
-  el.target="_blank";
-  el.className="block bg-white border rounded p-4";
-  el.innerHTML =
-    "<strong>"+item.title+"</strong><br>" +
-    "<span>"+item.keyword+" · "+item.date+" · "+item.risk+"</span>";
-  list.appendChild(el);
-});
 </script>
 
 </body>
 </html>
-"""
-
-html = html.replace("__DATA__", json_payload)
-html = html.replace("__COUNT__", str(len(news_data)))
-
-with open(output_filename, "w", encoding="utf-8") as f:
-    f.write(html)
-
-print("index.html 생성 완료")
