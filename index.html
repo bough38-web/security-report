@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Security Insight Pro - 7 Days</title>
+    <title>Security Insight Pro - Timeline</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -13,14 +13,11 @@
 
     <style>
         body { font-family: 'Pretendard', sans-serif; background-color: #f0f4f8; color: #1e293b; }
-        
-        /* 스크롤바 커스텀 */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        /* 고급 카드 스타일 (Glassmorphism + Shadow) */
+        
+        /* 대시보드 카드 스타일 */
         .dashboard-card {
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid #e2e8f0;
@@ -34,7 +31,7 @@
             border-color: #cbd5e1;
         }
 
-        /* 키워드 그룹 버튼 스타일 */
+        /* 키워드 버튼 스타일 */
         .group-label { font-size: 0.7rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
         .kw-btn {
             font-size: 0.8rem; padding: 6px 12px; border-radius: 8px; 
@@ -44,13 +41,24 @@
         .kw-btn:hover { background: #e2e8f0; color: #1e293b; }
         .kw-btn.active { background: #3b82f6; color: white; border-color: #2563eb; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
 
-        /* 리스크 뱃지 */
+        /* 날짜 라디오 버튼 스타일 */
+        .date-radio-group { display: flex; background: #f1f5f9; padding: 4px; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .date-radio-item { flex: 1; text-align: center; }
+        .date-radio-item input { display: none; }
+        .date-radio-item label {
+            display: block; padding: 6px 0; font-size: 0.8rem; font-weight: 600; color: #64748b;
+            cursor: pointer; border-radius: 8px; transition: all 0.2s;
+        }
+        .date-radio-item input:checked + label {
+            background: white; color: #3b82f6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-weight: 700;
+        }
+
+        /* 뱃지 */
         .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
         .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         .badge-AMBER { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
         .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
 
-        /* 로딩 애니메이션 */
         #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
     </style>
 </head>
@@ -59,7 +67,7 @@
 
     <div id="loader">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-slate-600 font-bold animate-pulse">최근 7일 데이터 분석 중...</p>
+        <p class="text-slate-600 font-bold animate-pulse">보안 데이터 분석 중...</p>
     </div>
 
     <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 shadow-xl backdrop-blur-md bg-opacity-95 border-b border-slate-700">
@@ -70,7 +78,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg tracking-tight leading-none">Security Insight <span class="text-blue-400">Pro</span></h1>
-                    <p class="text-[10px] text-slate-400 font-medium tracking-wider mt-0.5">WEEKLY INTELLIGENCE REPORT</p>
+                    <p class="text-[10px] text-slate-400 font-medium tracking-wider mt-0.5">WEEKLY INTELLIGENCE</p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
@@ -79,7 +87,7 @@
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
-                    Live Data (Last 7 Days)
+                    System Live
                 </div>
             </div>
         </div>
@@ -110,7 +118,7 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="dashboard-card p-5 border-l-4 border-blue-500">
                 <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Weekly News</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">News Count</span>
                     <i class="ph-duotone ph-newspaper text-2xl text-blue-500/50"></i>
                 </div>
                 <h3 id="kpi-total" class="text-3xl font-bold text-slate-800">-</h3>
@@ -150,11 +158,32 @@
                         <button onclick="resetFilter()" class="text-xs text-slate-400 hover:text-blue-500 underline">초기화</button>
                     </div>
 
-                    <div class="space-y-4" id="group-filter-container">
+                    <div class="mb-5">
+                        <label class="block text-xs font-bold text-slate-400 mb-2">PERIOD</label>
+                        <div class="date-radio-group">
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-1" name="date-range" value="1" onchange="setDateFilter('1')">
+                                <label for="d-1">오늘</label>
+                            </div>
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-3" name="date-range" value="3" onchange="setDateFilter('3')">
+                                <label for="d-3">3일</label>
+                            </div>
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-7" name="date-range" value="7" checked onchange="setDateFilter('7')">
+                                <label for="d-7">7일</label>
+                            </div>
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-all" name="date-range" value="ALL" onchange="setDateFilter('ALL')">
+                                <label for="d-all">전체</label>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="space-y-4" id="group-filter-container"></div>
 
                     <div class="mt-6 pt-4 border-t border-slate-100">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">DETAIL SEARCH</label>
+                        <label class="block text-xs font-bold text-slate-400 mb-2">SEARCH</label>
                         <div class="relative">
                             <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
                             <input id="filter-search" type="text" placeholder="제목/키워드 검색..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none transition-all">
@@ -173,27 +202,21 @@
             <div class="lg:col-span-8">
                 <div class="flex items-end justify-between mb-4 px-1">
                     <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                        Weekly Feed
+                        News Feed
                         <span id="list-count" class="text-xs font-bold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500 shadow-sm">0</span>
                     </h3>
-                    <div class="text-xs text-slate-400 flex gap-2">
-                        <span><i class="ph-fill ph-circle text-red-500"></i> Critical</span>
-                        <span><i class="ph-fill ph-circle text-amber-500"></i> Warning</span>
-                    </div>
+                    <span id="current-period-text" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">최근 7일</span>
                 </div>
-                <div id="news-list" class="space-y-3">
-                    </div>
+                <div id="news-list" class="space-y-3"></div>
             </div>
         </div>
 
         <footer class="text-center text-xs text-slate-400 py-8 border-t border-slate-200 mt-8">
-            &copy; 2025 Security Insight Pro. Powered by AI Analysis.
+            &copy; 2025 Security Insight Pro.
         </footer>
-
     </div>
 
     <script>
-        // --- 설정: 키워드 그룹 정의 ---
         const KEYWORD_GROUPS = {
             "무인경비": ["KT텔레캅", "에스원", "SK쉴더스", "CCTV", "보안관제"],
             "통신/테크": ["KT", "SK", "LG", "애플", "아이폰", "갤럭시", "삼성"],
@@ -204,19 +227,17 @@
         let rawData = [];
         let filteredData = [];
         let charts = {};
-        let currentFilter = "ALL"; // 현재 선택된 필터 (그룹명 또는 키워드)
+        
+        // 상태 변수
+        let currentKeywordFilter = "ALL";
+        let currentDateRange = "7"; // 기본 7일
 
-        // --- 1. 데이터 로드 및 7일 필터링 ---
+        // 1. 데이터 로드 (전체 로드 후 필터링)
         Papa.parse("data.csv", {
             download: true,
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                const today = new Date();
-                const sevenDaysAgo = new Date();
-                sevenDaysAgo.setDate(today.getDate() - 7);
-
-                // 데이터 전처리 및 날짜 필터링
                 rawData = results.data
                     .map(item => {
                         const dateStr = item.date_fmt || item.date || "";
@@ -229,34 +250,29 @@
                             dateObj: new Date(dateStr)
                         };
                     })
-                    // 7일 이내 데이터만 통과 & 유효한 제목
-                    .filter(item => item.title && !isNaN(item.dateObj) && item.dateObj >= sevenDaysAgo);
+                    .filter(item => item.title && !isNaN(item.dateObj)); // 유효성 검사
 
-                // 날짜 최신순 정렬
+                // 최신순 정렬
                 rawData.sort((a, b) => b.dateObj - a.dateObj);
 
                 document.getElementById("loader").style.display = "none";
                 
-                // 초기화
                 renderGroupButtons();
-                applyFilter();
+                applyFilter(); // 초기 필터 적용
             },
             error: function(err) {
                 document.getElementById("loader").style.display = "none";
-                document.getElementById("ai-summary").textContent = "데이터 로드 실패. CSV 파일을 확인해주세요.";
+                document.getElementById("ai-summary").textContent = "데이터 로드 실패";
             }
         });
 
-        // --- 2. 그룹형 버튼 렌더링 ---
+        // 2. 버튼 렌더링
         function renderGroupButtons() {
             const container = document.getElementById("group-filter-container");
             container.innerHTML = "";
-
-            // 존재하는 키워드만 추출해서 그룹핑
             const presentKeywords = new Set(rawData.map(d => d.keyword));
 
             Object.keys(KEYWORD_GROUPS).forEach(groupName => {
-                // 해당 그룹에 속하는 데이터가 하나라도 있을 때만 표시
                 const groupKeywords = KEYWORD_GROUPS[groupName].filter(k => 
                     [...presentKeywords].some(pk => pk.includes(k) || k.includes(pk))
                 );
@@ -272,24 +288,21 @@
                     const btnWrap = document.createElement("div");
                     btnWrap.className = "flex flex-wrap gap-2";
 
-                    // 그룹 전체 보기 버튼
                     const groupBtn = document.createElement("button");
                     groupBtn.className = "kw-btn";
                     groupBtn.dataset.val = `GROUP:${groupName}`;
                     groupBtn.textContent = "전체";
-                    groupBtn.onclick = () => setFilter(`GROUP:${groupName}`, groupBtn);
+                    groupBtn.onclick = () => setKeywordFilter(`GROUP:${groupName}`, groupBtn);
                     btnWrap.appendChild(groupBtn);
 
-                    // 개별 키워드 버튼
                     groupKeywords.forEach(kw => {
-                        // 실제 데이터에 있는 키워드만 버튼 생성 (매칭 로직 완화)
                         const isExist = [...presentKeywords].some(pk => pk.includes(kw) || kw.includes(pk));
                         if(isExist) {
                             const btn = document.createElement("button");
                             btn.className = "kw-btn";
                             btn.dataset.val = kw;
                             btn.textContent = kw;
-                            btn.onclick = () => setFilter(kw, btn);
+                            btn.onclick = () => setKeywordFilter(kw, btn);
                             btnWrap.appendChild(btn);
                         }
                     });
@@ -300,39 +313,67 @@
             });
         }
 
-        // --- 3. 필터링 로직 ---
-        function setFilter(val, btnElement) {
-            currentFilter = val;
-            
-            // 버튼 활성 상태 스타일 변경
+        // 3. 필터 제어 함수
+        function setKeywordFilter(val, btnElement) {
+            currentKeywordFilter = val;
             document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
             if(btnElement) btnElement.classList.add('active');
+            applyFilter();
+        }
+
+        function setDateFilter(val) {
+            currentDateRange = val;
+            
+            // 텍스트 업데이트
+            const textMap = {"1": "오늘 (24h)", "3": "최근 3일", "7": "최근 7일", "ALL": "전체 기간"};
+            document.getElementById("current-period-text").textContent = textMap[val];
 
             applyFilter();
         }
 
         function resetFilter() {
-            currentFilter = "ALL";
+            currentKeywordFilter = "ALL";
+            currentDateRange = "7"; // 기본값 복귀
+            
             document.getElementById("filter-search").value = "";
             document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
+            
+            // 라디오 버튼 UI 초기화
+            document.querySelector('input[name="date-range"][value="7"]').checked = true;
+            document.getElementById("current-period-text").textContent = "최근 7일";
+
             applyFilter();
         }
 
+        // 4. 통합 필터 로직
         function applyFilter() {
             const searchVal = document.getElementById("filter-search").value.toLowerCase();
+            const today = new Date();
+            
+            // 날짜 기준 계산
+            let dateCutoff = null;
+            if (currentDateRange !== "ALL") {
+                dateCutoff = new Date();
+                dateCutoff.setDate(today.getDate() - parseInt(currentDateRange));
+                // 오늘(1일) 선택 시 시간까지 고려하지 않으려면 날짜만 비교하거나 자정 기준으로 설정
+                dateCutoff.setHours(0,0,0,0); 
+            }
 
             filteredData = rawData.filter(item => {
-                // 1. 그룹/키워드 필터
+                // A. 날짜 필터
+                if (dateCutoff && item.dateObj < dateCutoff) return false;
+
+                // B. 키워드 필터
                 let groupMatch = true;
-                if (currentFilter.startsWith("GROUP:")) {
-                    const groupName = currentFilter.split(":")[1];
+                if (currentKeywordFilter.startsWith("GROUP:")) {
+                    const groupName = currentKeywordFilter.split(":")[1];
                     const keywords = KEYWORD_GROUPS[groupName];
                     groupMatch = keywords.some(k => item.keyword.includes(k) || k.includes(item.keyword));
-                } else if (currentFilter !== "ALL") {
-                    groupMatch = item.keyword.includes(currentFilter) || currentFilter.includes(item.keyword);
+                } else if (currentKeywordFilter !== "ALL") {
+                    groupMatch = item.keyword.includes(currentKeywordFilter) || currentKeywordFilter.includes(item.keyword);
                 }
 
-                // 2. 검색창 필터
+                // C. 검색어 필터
                 const searchMatch = item.title.toLowerCase().includes(searchVal) || 
                                     item.keyword.toLowerCase().includes(searchVal);
 
@@ -342,35 +383,30 @@
             renderDashboard();
         }
 
-        // --- 4. 대시보드 렌더링 ---
+        // 5. 렌더링
         function renderDashboard() {
             const data = filteredData;
-
-            // [AI Summary Logic - 중복제거 및 스마트 요약]
             const total = data.length;
             const redCount = data.filter(d => d.risk === 'RED').length;
             
-            // 중복 제목 제거 (유사도 체크는 아니지만 동일 제목 방지)
-            const uniqueTitles = [...new Set(data.map(d => d.title))];
-            
+            // AI Summary
             let summaryText = "";
             if (total === 0) {
-                summaryText = "최근 7일간 해당 조건에 맞는 데이터가 없습니다.";
+                summaryText = "선택한 조건에 맞는 데이터가 없습니다.";
             } else {
-                // 가장 많이 등장한 키워드 찾기
                 const kwCounts = {};
                 data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
                 const topKw = Object.entries(kwCounts).sort((a,b)=>b[1]-a[1])[0][0];
 
                 if (redCount > 0) {
-                    summaryText = `최근 7일간 <span class="text-red-400 font-bold">심각(Critical) 이슈가 ${redCount}건</span> 발생했습니다. 주로 <strong>'${topKw}'</strong> 관련 내용이며, 즉각적인 모니터링이 필요합니다.`;
+                    summaryText = `해당 기간 내 <span class="text-red-400 font-bold">심각(Critical) 이슈가 ${redCount}건</span> 있습니다. <strong>'${topKw}'</strong> 관련 내용을 우선 확인하세요.`;
                 } else {
-                    summaryText = `최근 7일간 총 ${total}건의 뉴스가 수집되었습니다. <strong>'${topKw}'</strong> 키워드가 가장 활발하며, 전반적으로 특이사항 없는 안정적인 상태입니다.`;
+                    summaryText = `총 ${total}건의 뉴스가 수집되었습니다. 주요 키워드는 <strong>'${topKw}'</strong>이며, 특이 사항은 없습니다.`;
                 }
             }
             document.getElementById("ai-summary").innerHTML = summaryText;
 
-            // [KPIs]
+            // KPIs
             document.getElementById("kpi-total").textContent = total.toLocaleString();
             document.getElementById("kpi-red").textContent = redCount;
             document.getElementById("kpi-amber").textContent = data.filter(d => d.risk === "AMBER").length;
@@ -381,26 +417,21 @@
             document.getElementById("kpi-keyword").textContent = topKw;
             document.getElementById("list-count").textContent = total;
 
-            // [List Render]
+            // List
             const listContainer = document.getElementById("news-list");
             listContainer.innerHTML = "";
+            const displayedTitles = new Set();
 
             if (total === 0) {
                 listContainer.innerHTML = `<div class="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">데이터가 없습니다.</div>`;
             } else {
-                // 중복 제목은 흐릿하게 처리하거나 제외할 수도 있음. 여기서는 다 보여주되 시각적 구분을 둠.
-                const displayedTitles = new Set();
-                
                 data.forEach(d => {
-                    // 완전 동일 제목은 스킵 (AI 기능 흉내: 중복 제거)
                     if(displayedTitles.has(d.title)) return;
                     displayedTitles.add(d.title);
 
                     const el = document.createElement("a");
-                    el.href = d.link;
-                    el.target = "_blank";
+                    el.href = d.link; el.target = "_blank";
                     el.className = "block dashboard-card p-5 group no-underline relative overflow-hidden mb-3 hover:border-blue-400";
-                    
                     const badgeClass = `badge-${d.risk}`;
 
                     el.innerHTML = `
@@ -413,9 +444,7 @@
                                         <i class="ph-bold ph-calendar-blank"></i> ${d.date}
                                     </span>
                                 </div>
-                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
-                                    ${d.title}
-                                </h4>
+                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">${d.title}</h4>
                             </div>
                             <div class="bg-slate-50 p-2 rounded-lg group-hover:bg-blue-50 transition-colors">
                                 <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500"></i>
@@ -425,11 +454,9 @@
                     listContainer.appendChild(el);
                 });
             }
-
             updateCharts(data);
         }
 
-        // --- 5. 차트 업데이트 ---
         function updateCharts(data) {
             const rCounts = { RED: 0, AMBER: 0, GREEN: 0 };
             data.forEach(d => {
@@ -455,14 +482,11 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: "75%",
-                    plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Pretendard', size: 11 } } }
-                    }
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Pretendard', size: 11 } } } }
                 }
             });
         }
 
-        // 검색창 엔터키/입력 이벤트
         document.getElementById("filter-search").addEventListener("input", applyFilter);
     </script>
 </body>
