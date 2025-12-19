@@ -11,11 +11,8 @@ print(f"🔄 '{input_filename}' 데이터를 읽고 있습니다...")
 news_data = []
 
 try:
-    # 엑셀 CSV 호환성(utf-8-sig)
     with open(input_filename, mode='r', encoding='utf-8-sig') as csvfile:
         reader = csv.DictReader(csvfile)
-        
-        # 컬럼명 공백 제거
         if reader.fieldnames:
             reader.fieldnames = [h.strip() for h in reader.fieldnames]
 
@@ -23,17 +20,14 @@ try:
             title = row.get('title', '').strip()
             if not title: continue 
 
-            # 링크 처리 (http 없으면 붙이기)
             link = row.get('link', '').strip()
             if link and not link.startswith('http') and link != "#":
                 link = 'https://' + link
             if not link: link = "#"
 
-            # 날짜 처리
             date = row.get('date_fmt', '').strip()
             if not date: date = row.get('date', '').strip()
             
-            # 리스크 처리
             risk = row.get('risk', 'GREEN').strip().upper()
             if risk not in ['RED', 'AMBER', 'GREEN']: risk = 'GREEN'
 
@@ -44,22 +38,20 @@ try:
                 "date": date,
                 "risk": risk
             })
-
     print(f"✅ 데이터 로드 완료: {len(news_data)}건")
 
 except FileNotFoundError:
-    print("❌ 오류: data.csv 파일이 없습니다. (빈 데이터로 진행)")
+    print("❌ 오류: data.csv 파일이 없습니다.")
     news_data = []
 
-# --- [2] JSON 데이터 변환 (자바스크립트용) ---
-# 이 부분이 핵심입니다. 데이터를 미리 문자열로 만들어둡니다.
+# --- [2] JSON 데이터 준비 ---
 json_payload = json.dumps(news_data, ensure_ascii=False)
 
 
-# --- [3] HTML 생성 (f-string으로 데이터 직접 삽입) ---
-# __DATA_PLACEHOLDER__ 같은 임시 단어를 쓰지 않고, {json_payload}를 바로 집어넣습니다.
+# --- [3] HTML 템플릿 (일반 문자열 사용 - f 안 붙임) ---
+# 이제 자바스크립트 문법(${item.title} 등)을 그대로 써도 에러가 나지 않습니다.
 
-html_content = f"""
+html_template = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -70,13 +62,13 @@ html_content = f"""
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }}
-        .card {{ background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }}
-        .card:hover {{ transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }}
-        .badge-RED {{ background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }}
-        .badge-AMBER {{ background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }}
-        .badge-GREEN {{ background: #dcfce7; color: #166534; border: 1px solid #86efac; }}
-        #loader {{ position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
+        .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .badge-AMBER { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+        .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        #loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
@@ -102,9 +94,8 @@ html_content = f"""
                 <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
             </h2>
             <p class="text-slate-300 text-sm">
-                현재 <strong>{len(news_data)}건</strong>의 데이터가 로드되었습니다. 
+                현재 <strong><span id="total-count-txt">0</span>건</strong>의 데이터가 로드되었습니다. 
                 <span class="text-red-400 font-bold">RED 등급</span>(해킹/사고) 이슈는 즉시 확인 바랍니다.
-                아래 리스트를 클릭하면 <strong>기사 원문</strong>으로 이동합니다.
             </p>
         </div>
 
@@ -161,83 +152,75 @@ html_content = f"""
     </div>
 
     <script>
-        // ★★★ 여기가 핵심입니다. 데이터가 바로 주입됩니다. ★★★
-        const rawData = {json_payload};
+        // ★ 여기가 핵심: 데이터 치환 (Replace) ★
+        const rawData = __DATA_JSON__;
         
         let filteredData = [...rawData];
 
-        // 초기화
-        window.onload = function() {{
-            try {{
-                // 로딩 제거
-                document.getElementById('loader').style.display = 'none';
+        window.onload = function() {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('total-count-txt').textContent = rawData.length;
 
-                if (!rawData || rawData.length === 0) {{
-                    alert("데이터가 없습니다.");
-                    return;
-                }}
+            if (!rawData || rawData.length === 0) {
+                alert("데이터가 없습니다.");
+                return;
+            }
+            populateKeywords();
+            updateDashboard();
+        };
 
-                populateKeywords();
-                updateDashboard();
-
-            }} catch (err) {{
-                console.error(err);
-                alert("초기화 중 오류가 발생했습니다.");
-            }}
-        }};
-
-        function populateKeywords() {{
+        function populateKeywords() {
             const select = document.getElementById('filter-keyword');
             const keywords = [...new Set(rawData.map(d => d.keyword))].filter(k => k).sort();
-            keywords.forEach(k => {{
+            keywords.forEach(k => {
                 const opt = document.createElement('option');
                 opt.value = k;
                 opt.textContent = k;
                 select.appendChild(opt);
-            }});
-        }}
+            });
+        }
 
-        function updateDashboard() {{
+        function updateDashboard() {
             const kVal = document.getElementById('filter-keyword').value;
             const sVal = document.getElementById('filter-search').value.toLowerCase();
 
-            filteredData = rawData.filter(item => {{
+            filteredData = rawData.filter(item => {
                 const matchK = kVal === 'all' || item.keyword === kVal;
                 const matchS = item.title.toLowerCase().includes(sVal);
                 return matchK && matchS;
-            }});
+            });
 
             renderKPIs();
             renderList();
             renderChart();
-        }}
+        }
 
-        function renderKPIs() {{
+        function renderKPIs() {
             document.getElementById('kpi-total').textContent = filteredData.length;
             document.getElementById('kpi-red').textContent = filteredData.filter(d => d.risk === 'RED').length;
             document.getElementById('kpi-amber').textContent = filteredData.filter(d => d.risk === 'AMBER').length;
             
-            if(filteredData.length > 0) {{
-                const counts = {{}};
+            if(filteredData.length > 0) {
+                const counts = {};
                 filteredData.forEach(d => counts[d.keyword] = (counts[d.keyword]||0)+1);
                 const top = Object.keys(counts).reduce((a,b)=>counts[a]>counts[b]?a:b);
                 document.getElementById('kpi-keyword').textContent = top;
-            }} else {{
+            } else {
                 document.getElementById('kpi-keyword').textContent = "-";
-            }}
+            }
             document.getElementById('list-count').textContent = filteredData.length + "건";
-        }}
+        }
 
-        function renderList() {{
+        function renderList() {
             const container = document.getElementById('news-list');
             container.innerHTML = '';
 
-            if(filteredData.length === 0) {{
+            if(filteredData.length === 0) {
                 container.innerHTML = '<div class="p-8 text-center text-slate-400 border rounded">데이터 없음</div>';
                 return;
-            }}
+            }
 
-            filteredData.forEach(item => {{
+            filteredData.forEach(item => {
                 const el = document.createElement('a');
                 el.href = item.link;
                 el.target = '_blank';
@@ -245,56 +228,57 @@ html_content = f"""
                 
                 const badge = 'badge-' + item.risk;
 
+                // ★ 자바스크립트 템플릿 리터럴 (이제 ${...} 써도 에러 안 남) ★
                 el.innerHTML = `
                     <div class="flex justify-between items-start gap-4">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${{badge}}">${{item.risk}}</span>
-                                <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border">${{item.keyword}}</span>
-                                <span class="text-xs text-slate-400 font-mono">${{item.date}}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${badge}">${item.risk}</span>
+                                <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border">${item.keyword}</span>
+                                <span class="text-xs text-slate-400 font-mono">${item.date}</span>
                             </div>
                             <h4 class="font-bold text-base group-hover:text-blue-600 transition-colors leading-snug">
-                                ${{item.title}}
+                                ${item.title}
                             </h4>
                         </div>
                         <i class="ph-bold ph-arrow-square-out text-slate-300 text-lg group-hover:text-blue-500"></i>
                     </div>
                 `;
                 container.appendChild(el);
-            }});
-        }}
+            });
+        }
 
         let myChart = null;
-        function renderChart() {{
+        function renderChart() {
             if (typeof Chart === 'undefined') return;
 
-            const counts = {{'RED':0, 'AMBER':0, 'GREEN':0}};
-            filteredData.forEach(d => {{
+            const counts = {'RED':0, 'AMBER':0, 'GREEN':0};
+            filteredData.forEach(d => {
                 if(counts[d.risk]!==undefined) counts[d.risk]++;
                 else counts['GREEN']++;
-            }});
+            });
 
             const ctx = document.getElementById('riskChart').getContext('2d');
             if(myChart) myChart.destroy();
             
-            myChart = new Chart(ctx, {{
+            myChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: {{
+                data: {
                     labels: ['Red', 'Amber', 'Green'],
-                    datasets: [{{
+                    datasets: [{
                         data: [counts['RED'], counts['AMBER'], counts['GREEN']],
                         backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
                         borderWidth: 0
-                    }}]
-                }},
-                options: {{
+                    }]
+                },
+                options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '75%',
-                    plugins: {{ legend: {{ position: 'right', labels: {{ boxWidth: 10, usePointStyle: true }} }} }}
-                }}
-            }});
-        }}
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } } }
+                }
+            });
+        }
 
         // 리스너
         document.getElementById('filter-keyword').addEventListener('change', updateDashboard);
@@ -304,9 +288,12 @@ html_content = f"""
 </html>
 """
 
-# --- [4] 파일 저장 ---
+# --- [4] 데이터 삽입 및 파일 저장 ---
+# __DATA_JSON__ 부분을 실제 데이터로 교체합니다.
+final_html = html_template.replace('__DATA_JSON__', json_payload)
+
 with open(output_filename, 'w', encoding='utf-8') as f:
-    f.write(html_content)
+    f.write(final_html)
 
 print(f"✨ '{output_filename}' 생성 완료!")
-print("데이터가 HTML 안에 완전히 포함되었습니다. 이제 'PLACEHOLDER' 에러가 날 수 없습니다.")
+print("이제 자바스크립트 문법 충돌 없이 완벽하게 작동합니다.")
