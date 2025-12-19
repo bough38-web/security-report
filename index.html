@@ -1,245 +1,387 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Security Insight Pro</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; }
-        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.2s; }
-        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-        #loader { position: fixed; inset: 0; background: white; z-index: 99; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; color: #334155; }
+        
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* 글래스 효과 카드 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease-in-out;
+        }
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border-color: #cbd5e1;
+        }
+
+        /* 뱃지 스타일 */
+        .badge { padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; border: 1px solid transparent; }
+        .badge-RED { background-color: #fef2f2; color: #dc2626; border-color: #fecaca; }
+        .badge-AMBER { background-color: #fffbeb; color: #d97706; border-color: #fde68a; }
+        .badge-GREEN { background-color: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
     </style>
 </head>
-<body>
 
-    <div id="loader">
-        <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p class="text-slate-500 font-bold">보안 데이터 로딩 중...</p>
-    </div>
+<body class="antialiased">
 
-    <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 px-6 flex items-center justify-between shadow-lg">
-        <div class="flex items-center gap-2 font-bold text-lg">
-            <i class="ph-fill ph-shield-check text-blue-400"></i> Security Insight Pro
-        </div>
-        <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center gap-2">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Dual-Engine Crawling
+    <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 shadow-lg backdrop-blur-md bg-opacity-90">
+        <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="ph-fill ph-shield-check text-2xl text-blue-400"></i>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight">Security Insight <span class="text-blue-400">Pro</span></h1>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-widest leading-none">Intelligence Dashboard</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="hidden md:flex items-center gap-2 text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    Live Connection
+                </div>
+            </div>
         </div>
     </nav>
 
     <div class="max-w-7xl mx-auto p-6 space-y-6">
-        
-        <div class="glass-card p-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
-            <h2 class="font-bold text-lg mb-3 flex items-center gap-2">
-                <i class="ph-duotone ph-cpu"></i> AI Risk Analysis
-            </h2>
-            <p id="ai-msg" class="text-sm text-slate-300 bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10 leading-relaxed">
-                데이터 분석 중...
-            </p>
-            <div id="quick-btns" class="mt-4 flex flex-wrap gap-2"></div>
+
+        <div class="glass-card p-6 bg-gradient-to-r from-slate-800 to-slate-900 border-none text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-64 h-full bg-blue-500 opacity-10 blur-3xl transform translate-x-1/2"></div>
+            <div class="relative z-10 flex flex-col md:flex-row gap-6 items-start">
+                <div class="shrink-0 p-3 bg-white/10 rounded-xl">
+                    <i class="ph-duotone ph-robot text-3xl text-blue-300"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg mb-2 flex items-center gap-2">AI Analysis Report</h2>
+                    <p id="summary" class="text-slate-300 text-sm leading-relaxed">데이터 분석 대기 중...</p>
+                </div>
+            </div>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="glass-card p-5 border-l-4 border-blue-500">
-                <p class="text-xs text-slate-500 font-bold uppercase">Total News</p>
-                <h3 id="kpi-total" class="text-3xl font-bold text-slate-800 mt-2">-</h3>
+                <div class="flex justify-between items-start">
+                    <p class="text-xs font-bold text-slate-500 uppercase">Total Articles</p>
+                    <i class="ph-duotone ph-article text-xl text-blue-500"></i>
+                </div>
+                <p id="kpi-total" class="text-3xl font-bold text-slate-800 mt-2">-</p>
             </div>
-            <div class="glass-card p-5 border-l-4 border-red-500 bg-red-50/20">
-                <p class="text-xs text-red-600 font-bold uppercase">Critical</p>
-                <h3 id="kpi-red" class="text-3xl font-bold text-red-600 mt-2">-</h3>
+            <div class="glass-card p-5 border-l-4 border-red-500">
+                <div class="flex justify-between items-start">
+                    <p class="text-xs font-bold text-red-600 uppercase">Critical (Red)</p>
+                    <i class="ph-duotone ph-siren text-xl text-red-500"></i>
+                </div>
+                <p id="kpi-red" class="text-3xl font-bold text-red-600 mt-2">-</p>
             </div>
             <div class="glass-card p-5 border-l-4 border-amber-500">
-                <p class="text-xs text-amber-600 font-bold uppercase">Warning</p>
-                <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</h3>
+                <div class="flex justify-between items-start">
+                    <p class="text-xs font-bold text-amber-600 uppercase">Warning (Amber)</p>
+                    <i class="ph-duotone ph-warning text-xl text-amber-500"></i>
+                </div>
+                <p id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</p>
             </div>
             <div class="glass-card p-5 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold uppercase">Main Issue</p>
-                <h3 id="kpi-kw" class="text-lg font-bold text-green-700 mt-3 truncate">-</h3>
+                <div class="flex justify-between items-start">
+                    <p class="text-xs font-bold text-green-600 uppercase">Top Keyword</p>
+                    <i class="ph-duotone ph-trend-up text-xl text-green-500"></i>
+                </div>
+                <p id="kpi-keyword" class="text-xl font-bold text-green-700 mt-3 truncate">-</p>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="space-y-6">
-                <div class="glass-card p-5 sticky top-24">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4 pb-2 border-b">Control Panel</h3>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass-card p-5 sticky top-20">
+                    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                        <i class="ph-bold ph-faders text-slate-500"></i>
+                        <h3 class="font-bold text-sm text-slate-700">Filter & Search</h3>
+                    </div>
+                    
                     <div class="space-y-4">
                         <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">Keyword Filter</label>
-                            <select id="sel-kw" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 cursor-pointer"><option value="all">전체 보기</option></select>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">키워드 (Keyword)</label>
+                            <div class="relative">
+                                <select id="filter-keyword" class="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 appearance-none cursor-pointer">
+                                    <option value="all">All Keywords</option>
+                                </select>
+                                <i class="ph-bold ph-caret-down absolute right-3 top-2.5 text-slate-400 pointer-events-none"></i>
+                            </div>
                         </div>
                         <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">Search</label>
-                            <input id="inp-search" type="text" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="제목 검색...">
+                            <label class="block text-xs font-bold text-slate-500 mb-1">검색 (Search)</label>
+                            <div class="relative">
+                                <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
+                                <input id="filter-search" type="text" placeholder="제목 검색..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500">
+                            </div>
                         </div>
                     </div>
                 </div>
+
                 <div class="glass-card p-5">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4">Risk Share</h3>
-                    <div class="h-48 relative"><canvas id="chart"></canvas></div>
+                    <h3 class="font-bold text-xs text-slate-500 uppercase mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-chart-pie-slice"></i> Risk Distribution
+                    </h3>
+                    <div class="h-48 relative"><canvas id="riskChart"></canvas></div>
+                </div>
+
+                <div class="glass-card p-5">
+                    <h3 class="font-bold text-xs text-slate-500 uppercase mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-chart-line-up"></i> Daily Trend
+                    </h3>
+                    <div class="h-40 relative"><canvas id="trendChart"></canvas></div>
                 </div>
             </div>
 
-            <div class="lg:col-span-2">
-                <div class="flex justify-between items-end mb-4 px-1">
+            <div class="lg:col-span-8">
+                <div class="flex items-end justify-between mb-4 px-1">
                     <h3 class="font-bold text-lg text-slate-800">News Feed</h3>
-                    <span id="cnt" class="text-xs font-bold bg-white border px-2 py-1 rounded text-slate-500 shadow-sm">0 items</span>
+                    <span id="list-count" class="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500 shadow-sm">Loading...</span>
                 </div>
-                <div id="list" class="space-y-3"></div>
+                <div id="news-list" class="space-y-3">
+                    </div>
             </div>
         </div>
-        
-        <footer class="mt-12 py-8 text-center text-xs text-slate-400 border-t">
-            &copy; 2025 Security Insight Pro. Powered by Hybrid Crawler.
+
+        <footer class="text-center text-xs text-slate-400 py-8 border-t border-slate-200 mt-8">
+            &copy; 2025 Security Insight Pro Dashboard. All rights reserved.
         </footer>
+
     </div>
 
     <script>
-        // ★★★ Base64 데이터 디코딩 (깨짐 방지) ★★★
-        const B64_DATA = "W3sia2V5d29yZCI6ICLsi5zsiqTthZwiLCAidGl0bGUiOiAi7ZiE7J6sIOyImOynkSDqsIDriqXtlZwg64m07Iqk6rCAIOyXhuqxsOuCmCDsoJHsho3snbQg7LCo64uo65CY7JeI7Iq164uI64ukLiIsICJsaW5rIjogIiMiLCAiZGF0ZSI6ICIyMDI1LTEyLTE5IiwgInJpc2siOiAiUkVEIn1d";
-        const B64_KW = "WyJLVO2FlOugiOy6hSIsICJTS+yJtOuNlOyKpCIsICLsl5DsiqTsm5AiLCAi67O07JWIIOyCrOqzoCIsICLtlbTtgrkiLCAi6rCc7J247KCV67O0IOycoOy2nCIsICLsgrDsl4Ug7J6s7ZW0Il0=";
-        
-        function decodeData(str) {
-            try {
-                return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.codePointAt(0))));
-            } catch (e) { console.error(e); return []; }
-        }
+        let rawData = [];
+        let filteredData = [];
+        let charts = {}; // 차트 인스턴스 저장
 
-        let rawData = [], keywords = [], filtered = [], myChart = null;
+        // 1. 데이터 로드 (PapaParse 사용)
+        Papa.parse("data.csv", {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                // 데이터 전처리
+                rawData = results.data.map(item => ({
+                    keyword: item.keyword ? item.keyword.trim() : "",
+                    title: item.title ? item.title.trim() : "",
+                    link: (item.link && item.link.trim()) ? item.link.trim() : "#",
+                    // 날짜 필드가 여러개일 경우 date_fmt 우선 사용
+                    date: (item.date_fmt || item.date || "Unknown").trim(),
+                    risk: item.risk ? item.risk.trim().toUpperCase() : "GREEN"
+                }));
 
-        window.onload = () => {
-            rawData = decodeData(B64_DATA);
-            keywords = decodeData(B64_KW);
-            filtered = [...rawData];
-
-            setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 600);
-            init();
-        };
-
-        function init() {
-            const btnArea = document.getElementById('quick-btns');
-            const sel = document.getElementById('sel-kw');
-            
-            keywords.forEach(k => {
-                const opt = document.createElement('option');
-                opt.value = k; opt.textContent = k;
-                sel.appendChild(opt);
-                
-                const btn = document.createElement('button');
-                btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-blue-500 hover:text-white transition-colors border border-slate-600";
-                btn.textContent = k;
-                btn.onclick = () => { sel.value = k; update(); };
-                btnArea.appendChild(btn);
-            });
-            update();
-        }
-
-        function update() {
-            const kw = document.getElementById('sel-kw').value;
-            const search = document.getElementById('inp-search').value.toLowerCase();
-
-            filtered = rawData.filter(d => {
-                return (kw === 'all' || d.keyword === kw) && d.title.toLowerCase().includes(search);
-            });
-            render();
-        }
-
-        function render() {
-            // KPI
-            document.getElementById('kpi-total').textContent = filtered.length;
-            const red = filtered.filter(d=>d.risk==='RED').length;
-            document.getElementById('kpi-red').textContent = red;
-            document.getElementById('kpi-amber').textContent = filtered.filter(d=>d.risk==='AMBER').length;
-            
-            if(filtered.length > 0) {
-                const c = {};
-                filtered.forEach(d=>c[d.keyword]=(c[d.keyword]||0)+1);
-                const top = Object.keys(c).reduce((a,b)=>c[a]>c[b]?a:b);
-                document.getElementById('kpi-kw').textContent = top;
-            } else {
-                document.getElementById('kpi-kw').textContent = "-";
+                // 초기화 실행
+                initFilters();
+                filterData();
+            },
+            error: function(err) {
+                document.getElementById("summary").textContent = "데이터 로드 실패: CSV 파일을 확인해주세요.";
+                console.error("PapaParse Error:", err);
             }
+        });
 
-            // AI Summary
-            const msg = document.getElementById('ai-msg');
-            if(red > 0) {
-                msg.innerHTML = `⚠️ 현재 <span class="text-red-400 font-bold">심각(Critical) 등급 이슈가 ${red}건</span> 감지되었습니다.<br>해킹, 유출, 사고 등 주요 보안 위협 키워드가 포함된 기사를 우선적으로 확인하시기 바랍니다.`;
+        // 2. 필터 초기화
+        function initFilters() {
+            const keywordSet = new Set(rawData.map(d => d.keyword).filter(k => k));
+            const select = document.getElementById("filter-keyword");
+            [...keywordSet].sort().forEach(k => {
+                const opt = document.createElement("option");
+                opt.value = k;
+                opt.textContent = k.toUpperCase();
+                select.appendChild(opt);
+            });
+
+            // 이벤트 리스너 등록
+            document.getElementById("filter-keyword").addEventListener("change", filterData);
+            document.getElementById("filter-search").addEventListener("input", filterData);
+        }
+
+        // 3. 데이터 필터링 및 렌더링 트리거
+        function filterData() {
+            const kVal = document.getElementById("filter-keyword").value;
+            const sVal = document.getElementById("filter-search").value.toLowerCase();
+
+            filteredData = rawData.filter(item => {
+                const matchK = kVal === "all" || item.keyword === kVal;
+                const matchS = item.title.toLowerCase().includes(sVal);
+                return matchK && matchS;
+            });
+
+            renderDashboard();
+        }
+
+        // 4. 대시보드 렌더링 (메인 함수)
+        function renderDashboard() {
+            const data = filteredData;
+
+            // [Summary]
+            const topRisk = data.filter(d => d.risk === 'RED').length;
+            const summaryHTML = topRisk > 0 
+                ? `현재 로드된 <strong>${data.length}건</strong> 중 <span class="text-red-400 font-bold">RED(Critical) 등급이 ${topRisk}건</span> 감지되었습니다. 즉각적인 확인이 필요합니다.`
+                : `현재 로드된 <strong>${data.length}건</strong>의 데이터가 모두 정상 범위 내에 있거나 주의 단계입니다.`;
+            document.getElementById("summary").innerHTML = summaryHTML;
+
+            // [KPIs]
+            document.getElementById("kpi-total").textContent = data.length.toLocaleString();
+            document.getElementById("kpi-red").textContent = data.filter(d => d.risk === "RED").length.toLocaleString();
+            document.getElementById("kpi-amber").textContent = data.filter(d => d.risk === "AMBER").length.toLocaleString();
+
+            const kwCount = {};
+            data.forEach(d => kwCount[d.keyword] = (kwCount[d.keyword] || 0) + 1);
+            const topKw = Object.entries(kwCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+            document.getElementById("kpi-keyword").textContent = topKw.toUpperCase();
+            document.getElementById("list-count").textContent = `Total: ${data.length} results`;
+
+            // [List]
+            const listContainer = document.getElementById("news-list");
+            listContainer.innerHTML = "";
+            
+            if (data.length === 0) {
+                listContainer.innerHTML = `<div class="text-center py-10 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">검색 결과가 없습니다.</div>`;
             } else {
-                msg.innerHTML = `✅ 분석 결과, 현재 특이한 보안 위협 징후는 발견되지 않았습니다.<br>모든 시스템 및 모니터링 지표가 정상 범위 내에 있습니다.`;
-            }
-
-            // List
-            const list = document.getElementById('list');
-            list.innerHTML = '';
-            document.getElementById('cnt').textContent = `${filtered.length} items`;
-
-            if(filtered.length === 0) {
-                list.innerHTML = '<div class="p-12 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">데이터가 없습니다.</div>';
-            } else {
-                filtered.forEach(d => {
-                    const el = document.createElement('a');
-                    el.href = d.link; el.target = "_blank";
-                    el.className = "block glass-card p-5 group no-underline relative hover:border-blue-400 transition-all";
+                data.forEach(d => {
+                    const el = document.createElement("a");
+                    el.href = d.link;
+                    el.target = "_blank";
+                    el.className = "block glass-card p-5 group no-underline relative overflow-hidden";
                     
-                    let badgeClass = "bg-green-100 text-green-700 border-green-200";
-                    if(d.risk === 'RED') badgeClass = "bg-red-100 text-red-700 border-red-200";
-                    if(d.risk === 'AMBER') badgeClass = "bg-amber-100 text-amber-700 border-amber-200";
+                    // Risk Badge Color Logic
+                    const badgeClass = `badge-${d.risk}`; // badge-RED, badge-GREEN etc.
 
                     el.innerHTML = `
-                        <div class="flex justify-between items-start gap-4">
-                            <div class="flex-1">
-                                <div class="flex gap-2 mb-2 items-center flex-wrap">
-                                    <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${badgeClass}">${d.risk}</span>
-                                    <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 font-bold tracking-wide">${d.keyword}</span>
-                                    <span class="text-xs text-slate-400 font-mono flex items-center gap-1"><i class="ph-bold ph-calendar-blank"></i> ${d.date}</span>
+                        <div class="flex justify-between items-start gap-3 relative z-10">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                    <span class="badge ${badgeClass}">${d.risk}</span>
+                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wide">${d.keyword.toUpperCase()}</span>
+                                    <span class="text-xs text-slate-400 flex items-center gap-1 font-mono">
+                                        <i class="ph-bold ph-calendar-blank"></i> ${d.date}
+                                    </span>
                                 </div>
-                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors">
+                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
                                     ${d.title}
                                 </h4>
+                                <div class="mt-2 flex items-center gap-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i class="ph-bold ph-link"></i> 원문 보러가기
+                                </div>
                             </div>
                             <div class="bg-slate-50 p-2 rounded-lg group-hover:bg-blue-50 transition-colors">
-                                <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500 text-lg"></i>
+                                <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500"></i>
                             </div>
                         </div>
                     `;
-                    list.appendChild(el);
+                    listContainer.appendChild(el);
                 });
             }
 
-            // Chart
-            if(myChart) myChart.destroy();
-            const counts = {RED:0, AMBER:0, GREEN:0};
-            filtered.forEach(d => {
-                if(counts[d.risk]!==undefined) counts[d.risk]++;
-                else counts.GREEN++;
-            }});
+            // [Charts]
+            updateCharts(data);
+        }
 
-            const ctx = document.getElementById('chart');
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
+        // 5. 차트 업데이트 로직
+        function updateCharts(data) {
+            // 데이터 집계
+            const rCounts = { RED: 0, AMBER: 0, GREEN: 0 };
+            const dCounts = {}; // 날짜별 카운트
+
+            data.forEach(d => {
+                if (rCounts[d.risk] !== undefined) rCounts[d.risk]++;
+                else rCounts['GREEN']++; // fallback
+
+                // 날짜 포맷 (YYYY-MM-DD 만 추출)
+                const dateKey = d.date.substring(0, 10);
+                dCounts[dateKey] = (dCounts[dateKey] || 0) + 1;
+            });
+
+            // 5-1. Risk Doughnut Chart
+            const ctxRisk = document.getElementById("riskChart");
+            if (charts.risk) charts.risk.destroy();
+
+            charts.risk = new Chart(ctxRisk, {
+                type: "doughnut",
                 data: {
-                    labels: ['Critical', 'Warning', 'Safe'],
+                    labels: ["Critical", "Warning", "Safe"],
                     datasets: [{
-                        data: [counts.RED, counts.AMBER, counts.GREEN],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
-                        borderWidth: 0
+                        data: [rCounts.RED, rCounts.AMBER, rCounts.GREEN],
+                        backgroundColor: ["#ef4444", "#f59e0b", "#22c55e"],
+                        borderWidth: 0,
+                        hoverOffset: 5
                     }]
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    cutout: '75%', 
-                    plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { family: 'Pretendard' } } } } 
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: "75%",
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Pretendard' } } }
+                    }
+                }
+            });
+
+            // 5-2. Trend Line Chart (날짜 정렬)
+            const sortedDates = Object.keys(dCounts).sort();
+            const trendData = sortedDates.map(date => dCounts[date]);
+            
+            const ctxTrend = document.getElementById("trendChart");
+            if (charts.trend) charts.trend.destroy();
+
+            charts.trend = new Chart(ctxTrend, {
+                type: "line",
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: "Articles",
+                        data: trendData,
+                        borderColor: "#3b82f6",
+                        backgroundColor: (context) => {
+                            const ctx = context.chart.ctx;
+                            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                            gradient.addColorStop(0, "rgba(59, 130, 246, 0.2)");
+                            gradient.addColorStop(1, "rgba(59, 130, 246, 0)");
+                            return gradient;
+                        },
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { beginAtZero: true, display: false }
+                    },
+                    interaction: { mode: 'index', intersect: false }
                 }
             });
         }
-
-        document.getElementById('sel-kw').addEventListener('change', update);
-        document.getElementById('inp-search').addEventListener('input', update);
     </script>
 </body>
 </html>
