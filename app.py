@@ -1,341 +1,516 @@
-import requests
-from bs4 import BeautifulSoup
-import json
-import datetime
-import base64
-import random
-import os
-import time
-
-# ---------------------------------------------------------
-# [1] 설정 및 크롤링 (구글 뉴스 RSS + 네이버 백업)
-# ---------------------------------------------------------
-KEYWORDS = ["KT텔레캅", "SK쉴더스", "에스원", "보안 사고", "해킹", "개인정보 유출", "산업 재해"]
-OUTPUT_FILENAME = "index.html"
-
-def get_risk(title):
-    t = title.lower()
-    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌', '침해']): return 'RED'
-    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상', '중단']): return 'AMBER'
-    return 'GREEN'
-
-def crawl_google(kw):
-    try:
-        url = f"https://news.google.com/rss/search?q={kw}&hl=ko&gl=KR&ceid=KR:ko"
-        res = requests.get(url, timeout=5)
-        soup = BeautifulSoup(res.content, "xml")
-        items = soup.find_all("item")
-        results = []
-        for item in items[:3]:
-            dt_str = datetime.datetime.now().strftime("%Y-%m-%d")
-            try:
-                dt = datetime.datetime.strptime(item.pubDate.text, "%a, %d %b %Y %H:%M:%S %Z")
-                dt_str = dt.strftime("%Y-%m-%d")
-            except: pass
-            
-            results.append({
-                "keyword": kw, "title": item.title.text, "link": item.link.text, "date": dt_str, "risk": get_risk(item.title.text)
-            })
-        return results
-    except: return []
-
-def get_dummy_data():
-    return [{"keyword": k, "title": f"[{k}] 현재 수집된 뉴스가 없습니다 (샘플)", "link": "#", "date": datetime.datetime.now().strftime("%Y-%m-%d"), "risk": "GREEN"} for k in KEYWORDS[:5]]
-
-# ---------------------------------------------------------
-# [2] 데이터 수집 및 '안전한' 인코딩 (핵심 기술)
-# ---------------------------------------------------------
-print("🕷️ 데이터 수집 시작...")
-final_data = []
-
-# 1. 구글 뉴스 크롤링
-for kw in KEYWORDS:
-    data = crawl_google(kw)
-    if data:
-        final_data.extend(data)
-    time.sleep(0.1)
-
-# 2. 데이터 없으면 더미 데이터 사용
-if not final_data:
-    print("🚑 크롤링 실패 -> 비상용 샘플 데이터 생성")
-    final_data = get_dummy_data()
-
-# 3. ★ 핵심: 한글 깨짐 방지를 위해 ASCII로 변환 후 Base64 인코딩 ★
-# ensure_ascii=True를 쓰면 한글이 \uXXXX 형태의 영어 코드로 변해서 절대 안 깨짐
-json_str = json.dumps(final_data, ensure_ascii=True) 
-b64_data = base64.b64encode(json_str.encode('ascii')).decode('ascii')
-
-kw_str = json.dumps(KEYWORDS, ensure_ascii=True)
-b64_kw = base64.b64encode(kw_str.encode('ascii')).decode('ascii')
-
-print(f"✅ 총 {len(final_data)}건 데이터 처리 완료. HTML 생성 중...")
-
-# ---------------------------------------------------------
-# [3] HTML 템플릿 (멈춤 방지 스크립트 포함)
-# ---------------------------------------------------------
-html_template = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Insight Pro</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Security Insight Pro - Timeline</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; }
-        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
-        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-        #loader { position: fixed; inset: 0; background: white; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f0f4f8; color: #1e293b; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+            border-color: #cbd5e1;
+        }
+
+        /* 그룹 라벨 및 버튼 */
+        .group-label { font-size: 0.7rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .kw-btn {
+            font-size: 0.8rem; padding: 6px 12px; border-radius: 8px; 
+            background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+            transition: all 0.2s; cursor: pointer; font-weight: 500;
+        }
+        .kw-btn:hover { background: #e2e8f0; color: #1e293b; }
+        .kw-btn.active { background: #3b82f6; color: white; border-color: #2563eb; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
+
+        /* 날짜 라디오 버튼 */
+        .date-radio-group { display: flex; background: #f1f5f9; padding: 4px; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .date-radio-item { flex: 1; text-align: center; }
+        .date-radio-item input { display: none; }
+        .date-radio-item label {
+            display: block; padding: 6px 0; font-size: 0.8rem; font-weight: 600; color: #64748b;
+            cursor: pointer; border-radius: 8px; transition: all 0.2s;
+        }
+        .date-radio-item input:checked + label {
+            background: white; color: #3b82f6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-weight: 700;
+        }
+
+        /* 뱃지 */
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
+        .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-AMBER { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        
+        /* NEW 뱃지 */
+        .badge-new { 
+            background: #ef4444; color: white; font-size: 0.6rem; padding: 2px 6px; 
+            border-radius: 4px; font-weight: 800; animation: pulse 2s infinite; 
+            display: inline-flex; align-items: center; gap: 2px;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
     </style>
 </head>
-<body>
+
+<body class="antialiased">
 
     <div id="loader">
-        <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p class="text-slate-500 font-bold">시스템 초기화 중...</p>
-        <p id="error-msg" class="text-xs text-red-500 mt-2 hidden"></p>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p class="text-slate-600 font-bold animate-pulse">데이터 분석 중...</p>
     </div>
 
-    <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 px-6 flex items-center justify-between shadow-lg">
-        <div class="flex items-center gap-2 font-bold text-lg">
-            <i class="ph-fill ph-shield-check text-blue-400"></i> Security Insight Pro
-        </div>
-        <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700">
-            Live System
+    <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 shadow-xl backdrop-blur-md bg-opacity-95 border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-1.5 rounded-lg">
+                    <i class="ph-bold ph-shield-check text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight leading-none">Security Insight <span class="text-blue-400">Pro</span></h1>
+                    <p class="text-[10px] text-slate-400 font-medium tracking-wider mt-0.5">INTELLIGENCE DASHBOARD</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="hidden md:flex items-center gap-2 text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-600 text-slate-300">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    Live System
+                </div>
+            </div>
         </div>
     </nav>
 
     <div class="max-w-7xl mx-auto p-6 space-y-6">
-        
-        <div class="glass-card p-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
-            <h2 class="font-bold text-lg mb-3 flex items-center gap-2">
-                <i class="ph-duotone ph-cpu"></i> AI Risk Analysis
-            </h2>
-            <p id="ai-msg" class="text-sm text-slate-300 bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10 leading-relaxed">
-                데이터 분석 중...
-            </p>
-            <div id="quick-btns" class="mt-4 flex flex-wrap gap-2"></div>
-        </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="glass-card p-5 border-l-4 border-blue-500">
-                <p class="text-xs text-slate-500 font-bold uppercase">Total News</p>
-                <h3 id="kpi-total" class="text-3xl font-bold text-slate-800 mt-2">-</h3>
-            </div>
-            <div class="glass-card p-5 border-l-4 border-red-500 bg-red-50/20">
-                <p class="text-xs text-red-600 font-bold uppercase">Critical</p>
-                <h3 id="kpi-red" class="text-3xl font-bold text-red-600 mt-2">-</h3>
-            </div>
-            <div class="glass-card p-5 border-l-4 border-amber-500">
-                <p class="text-xs text-amber-600 font-bold uppercase">Warning</p>
-                <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</h3>
-            </div>
-            <div class="glass-card p-5 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold uppercase">Key Issue</p>
-                <h3 id="kpi-kw" class="text-lg font-bold text-green-700 mt-3 truncate">-</h3>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="space-y-6">
-                <div class="glass-card p-5 sticky top-24">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4 pb-2 border-b">Control Panel</h3>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">Keyword Filter</label>
-                            <select id="sel-kw" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 cursor-pointer"><option value="all">전체 보기</option></select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">Search</label>
-                            <input id="inp-search" type="text" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="제목 검색...">
+        <div class="dashboard-card p-0 overflow-hidden border-none relative shadow-lg">
+            <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white relative z-10">
+                <div class="flex flex-col md:flex-row gap-6 items-start">
+                    <div class="shrink-0 p-3 bg-white/10 rounded-xl backdrop-blur-md border border-white/10">
+                        <i class="ph-duotone ph-robot text-3xl text-blue-300"></i>
+                    </div>
+                    <div class="flex-1 w-full">
+                        <h2 class="font-bold text-lg mb-3 flex items-center gap-2 text-blue-100 border-b border-white/10 pb-2">
+                            AI Executive Briefing
+                            <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">Analysis Ready</span>
+                        </h2>
+                        <div id="ai-summary-content" class="text-slate-300 text-sm leading-relaxed space-y-3">
+                            <p class="animate-pulse">데이터를 분석하고 있습니다...</p>
                         </div>
                     </div>
                 </div>
-                <div class="glass-card p-5">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4">Risk Share</h3>
-                    <div class="h-48 relative"><canvas id="chart"></canvas></div>
+            </div>
+            <div class="absolute top-0 right-0 w-96 h-full bg-blue-500 opacity-10 blur-3xl transform translate-x-1/3 pointer-events-none"></div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="dashboard-card p-5 border-l-4 border-blue-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Collected</span>
+                    <i class="ph-duotone ph-newspaper text-2xl text-blue-500/50"></i>
+                </div>
+                <h3 id="kpi-total" class="text-3xl font-bold text-slate-800">-</h3>
+            </div>
+            <div class="dashboard-card p-5 border-l-4 border-red-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-red-600 uppercase tracking-wider">Critical</span>
+                    <i class="ph-duotone ph-warning-octagon text-2xl text-red-500/50"></i>
+                </div>
+                <h3 id="kpi-red" class="text-3xl font-bold text-red-600">-</h3>
+            </div>
+            <div class="dashboard-card p-5 border-l-4 border-amber-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">Warning</span>
+                    <i class="ph-duotone ph-siren text-2xl text-amber-500/50"></i>
+                </div>
+                <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600">-</h3>
+            </div>
+            <div class="dashboard-card p-5 border-l-4 border-green-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-green-600 uppercase tracking-wider">Main Topic</span>
+                    <i class="ph-duotone ph-trend-up text-2xl text-green-500/50"></i>
+                </div>
+                <h3 id="kpi-keyword" class="text-lg font-bold text-green-700 mt-2 truncate">-</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-4 space-y-6">
+                
+                <div class="dashboard-card p-5 sticky top-20 z-30">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                        <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                            <i class="ph-bold ph-funnel text-slate-500"></i> Smart Filter
+                        </h3>
+                        <button onclick="resetFilter()" class="text-xs text-slate-400 hover:text-blue-500 underline">초기화</button>
+                    </div>
+
+                    <div class="mb-5">
+                        <label class="block text-xs font-bold text-slate-400 mb-2">TIMELINE</label>
+                        <div class="date-radio-group">
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-1" name="date-range" value="1" onchange="setDateFilter('1')">
+                                <label for="d-1">오늘</label>
+                            </div>
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-3" name="date-range" value="3" onchange="setDateFilter('3')">
+                                <label for="d-3">3일</label>
+                            </div>
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-7" name="date-range" value="7" checked onchange="setDateFilter('7')">
+                                <label for="d-7">7일</label>
+                            </div>
+                            <div class="date-radio-item">
+                                <input type="radio" id="d-all" name="date-range" value="ALL" onchange="setDateFilter('ALL')">
+                                <label for="d-all">전체</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4" id="group-filter-container"></div>
+
+                    <div class="mt-6 pt-4 border-t border-slate-100">
+                        <label class="block text-xs font-bold text-slate-400 mb-2">SEARCH</label>
+                        <div class="relative">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
+                            <input id="filter-search" type="text" placeholder="제목/키워드 검색..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card p-5">
+                    <h3 class="font-bold text-xs text-slate-500 uppercase mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-chart-pie-slice"></i> Risk Share
+                    </h3>
+                    <div class="h-48 relative"><canvas id="riskChart"></canvas></div>
                 </div>
             </div>
 
-            <div class="lg:col-span-2">
-                <div class="flex justify-between items-end mb-4 px-1">
-                    <h3 class="font-bold text-lg text-slate-800">News Feed</h3>
-                    <span id="cnt" class="text-xs font-bold bg-white border px-2 py-1 rounded text-slate-500 shadow-sm">0 items</span>
+            <div class="lg:col-span-8">
+                <div class="flex items-end justify-between mb-4 px-1">
+                    <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                        News Feed
+                        <span id="list-count" class="text-xs font-bold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500 shadow-sm">0</span>
+                    </h3>
+                    <span id="current-period-text" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">최근 7일</span>
                 </div>
-                <div id="list" class="space-y-3"></div>
+                <div id="news-list" class="space-y-3"></div>
             </div>
         </div>
-        
-        <footer class="mt-12 py-8 text-center text-xs text-slate-400 border-t">
-            &copy; 2025 Security Insight Pro. Powered by Google News RSS.
+
+        <footer class="text-center text-xs text-slate-400 py-8 border-t border-slate-200 mt-8">
+            &copy; 2025 Security Insight Pro. Powered by Automated Intelligence.
         </footer>
     </div>
 
     <script>
-        // ★★★ Base64 데이터 수신 ★★★
-        const B64_DATA = "__DATA_B64__";
-        const B64_KW = "__KW_B64__";
-        
-        let rawData = [], keywords = [], filtered = [], myChart = null;
-
-        window.onload = function() {
-            try {
-                // 1. 디코딩 (atob는 ASCII만 처리하므로, 한글이 \uXXXX로 된 JSON을 파싱하면 됨)
-                rawData = JSON.parse(atob(B64_DATA));
-                keywords = JSON.parse(atob(B64_KW));
-                filtered = [...rawData];
-
-                // 2. 초기화
-                init();
-                
-                // 3. 로딩 제거
-                document.getElementById('loader').style.display = 'none';
-            } catch (e) {
-                console.error(e);
-                document.getElementById('error-msg').textContent = "초기화 오류: " + e.message;
-                document.getElementById('error-msg').style.display = 'block';
-                // 에러 나도 강제로 로딩 끄기
-                setTimeout(() => document.getElementById('loader').style.display = 'none', 1000);
-            }
+        const KEYWORD_GROUPS = {
+            "무인경비": ["KT텔레캅", "에스원", "SK쉴더스", "CCTV", "보안관제"],
+            "통신/테크": ["KT", "SK", "LG", "애플", "아이폰", "갤럭시", "삼성"],
+            "안전/사고": ["안전사고", "산업재해", "화재", "폭발", "중대재해", "붕괴"],
+            "보안/기타": ["해킹", "개인정보", "유출", "랜섬웨어", "보안", "피싱"]
         };
 
-        function init() {
-            const btnArea = document.getElementById('quick-btns');
-            const sel = document.getElementById('sel-kw');
-            
-            keywords.forEach(k => {
-                const opt = document.createElement('option');
-                opt.value = k; opt.textContent = k;
-                sel.appendChild(opt);
+        let rawData = [];
+        let filteredData = [];
+        let charts = {};
+        let currentKeywordFilter = "ALL";
+        let currentDateRange = "7";
+
+        // 1. 데이터 로드
+        Papa.parse("data.csv", {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                rawData = results.data
+                    .map(item => {
+                        const dateStr = item.date_fmt || item.date || "";
+                        return {
+                            keyword: item.keyword ? item.keyword.trim() : "기타",
+                            title: item.title ? item.title.trim() : "",
+                            link: (item.link && item.link.trim()) ? item.link.trim() : "#",
+                            date: dateStr,
+                            risk: item.risk ? item.risk.trim().toUpperCase() : "GREEN",
+                            dateObj: new Date(dateStr)
+                        };
+                    })
+                    .filter(item => item.title && !isNaN(item.dateObj)); 
+
+                // 날짜 내림차순 정렬 (최신순)
+                rawData.sort((a, b) => b.dateObj - a.dateObj);
                 
-                const btn = document.createElement('button');
-                btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-blue-500 hover:text-white transition-colors border border-slate-600";
-                btn.textContent = k;
-                btn.onclick = () => { sel.value = k; update(); };
-                btnArea.appendChild(btn);
-            });
-            update();
-        }
-
-        function update() {
-            const kw = document.getElementById('sel-kw').value;
-            const search = document.getElementById('inp-search').value.toLowerCase();
-
-            filtered = rawData.filter(d => {
-                return (kw === 'all' || d.keyword === kw) && d.title.toLowerCase().includes(search);
-            });
-            render();
-        }
-
-        function render() {
-            // KPI
-            document.getElementById('kpi-total').textContent = filtered.length;
-            const red = filtered.filter(d=>d.risk==='RED').length;
-            document.getElementById('kpi-red').textContent = red;
-            document.getElementById('kpi-amber').textContent = filtered.filter(d=>d.risk==='AMBER').length;
-            
-            if(filtered.length > 0) {
-                const c = {};
-                filtered.forEach(d=>c[d.keyword]=(c[d.keyword]||0)+1);
-                const top = Object.keys(c).reduce((a,b)=>c[a]>c[b]?a:b);
-                document.getElementById('kpi-kw').textContent = top;
-            } else {
-                document.getElementById('kpi-kw').textContent = "-";
+                document.getElementById("loader").style.display = "none";
+                
+                renderGroupButtons();
+                applyFilter();
+            },
+            error: function(err) {
+                document.getElementById("loader").style.display = "none";
+                document.getElementById("ai-summary-content").innerHTML = "<span class='text-red-400'>데이터 로드 실패. CSV 파일을 확인해주세요.</span>";
             }
+        });
 
-            // AI Summary
-            const msg = document.getElementById('ai-msg');
-            if(red > 0) {
-                msg.innerHTML = `⚠️ 현재 <span class="text-red-400 font-bold">심각(Critical) 등급 이슈가 ${red}건</span> 감지되었습니다. 주요 키워드를 확인하세요.`;
-            } else {
-                msg.innerHTML = `✅ 분석 결과, 현재 특이한 보안 위협 징후는 발견되지 않았습니다. (정상)`;
-            }
+        // 2. 그룹 버튼 렌더링
+        function renderGroupButtons() {
+            const container = document.getElementById("group-filter-container");
+            container.innerHTML = "";
+            const presentKeywords = new Set(rawData.map(d => d.keyword));
 
-            // List
-            const list = document.getElementById('list');
-            list.innerHTML = '';
-            document.getElementById('cnt').textContent = `${filtered.length} items`;
+            Object.keys(KEYWORD_GROUPS).forEach(groupName => {
+                const groupKeywords = KEYWORD_GROUPS[groupName].filter(k => 
+                    [...presentKeywords].some(pk => pk.includes(k) || k.includes(pk))
+                );
 
-            if(filtered.length === 0) {
-                list.innerHTML = '<div class="p-12 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">데이터가 없습니다.</div>';
-            } else {
-                filtered.forEach(d => {
-                    const el = document.createElement('a');
-                    el.href = d.link; el.target = "_blank";
-                    el.className = "block glass-card p-5 group no-underline relative hover:border-blue-400 transition-all";
+                if (groupKeywords.length > 0) {
+                    const groupDiv = document.createElement("div");
                     
-                    let badgeClass = "bg-green-100 text-green-700 border-green-200";
-                    if(d.risk === 'RED') badgeClass = "bg-red-100 text-red-700 border-red-200";
-                    if(d.risk === 'AMBER') badgeClass = "bg-amber-100 text-amber-700 border-amber-200";
+                    const label = document.createElement("div");
+                    label.className = "group-label";
+                    label.textContent = groupName;
+                    groupDiv.appendChild(label);
 
-                    el.innerHTML = `
-                        <div class="flex justify-between items-start gap-4">
-                            <div class="flex-1">
-                                <div class="flex gap-2 mb-2 items-center flex-wrap">
-                                    <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${badgeClass}">${d.risk}</span>
-                                    <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 font-bold tracking-wide">${d.keyword}</span>
-                                    <span class="text-xs text-slate-400 font-mono flex items-center gap-1"><i class="ph-bold ph-calendar-blank"></i> ${d.date}</span>
-                                </div>
-                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors">
-                                    ${d.title}
-                                </h4>
-                            </div>
-                            <div class="bg-slate-50 p-2 rounded-lg group-hover:bg-blue-50 transition-colors">
-                                <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500 text-lg"></i>
-                            </div>
-                        </div>
-                    `;
-                    list.appendChild(el);
-                });
-            }
+                    const btnWrap = document.createElement("div");
+                    btnWrap.className = "flex flex-wrap gap-2";
 
-            // Chart
-            if(myChart) myChart.destroy();
-            const counts = {RED:0, AMBER:0, GREEN:0};
-            filtered.forEach(d => {
-                if(counts[d.risk]!==undefined) counts[d.risk]++;
-                else counts.GREEN++;
-            });
+                    const groupBtn = document.createElement("button");
+                    groupBtn.className = "kw-btn";
+                    groupBtn.dataset.val = `GROUP:${groupName}`;
+                    groupBtn.textContent = "전체";
+                    groupBtn.onclick = () => setKeywordFilter(`GROUP:${groupName}`, groupBtn);
+                    btnWrap.appendChild(groupBtn);
 
-            const ctx = document.getElementById('chart');
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Critical', 'Warning', 'Safe'],
-                    datasets: [{
-                        data: [counts.RED, counts.AMBER, counts.GREEN],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    cutout: '75%', 
-                    plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { family: 'Pretendard' } } } } 
+                    groupKeywords.forEach(kw => {
+                        const isExist = [...presentKeywords].some(pk => pk.includes(kw) || kw.includes(pk));
+                        if(isExist) {
+                            const btn = document.createElement("button");
+                            btn.className = "kw-btn";
+                            btn.dataset.val = kw;
+                            btn.textContent = kw;
+                            btn.onclick = () => setKeywordFilter(kw, btn);
+                            btnWrap.appendChild(btn);
+                        }
+                    });
+                    groupDiv.appendChild(btnWrap);
+                    container.appendChild(groupDiv);
                 }
             });
         }
 
-        document.getElementById('sel-kw').addEventListener('change', update);
-        document.getElementById('inp-search').addEventListener('input', update);
+        // 3. 필터 제어
+        function setKeywordFilter(val, btnElement) {
+            currentKeywordFilter = val;
+            document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+            applyFilter();
+        }
+
+        function setDateFilter(val) {
+            currentDateRange = val;
+            const textMap = {"1": "오늘 (24h)", "3": "최근 3일", "7": "최근 7일", "ALL": "전체 기간"};
+            document.getElementById("current-period-text").textContent = textMap[val];
+            applyFilter();
+        }
+
+        function resetFilter() {
+            currentKeywordFilter = "ALL";
+            currentDateRange = "7"; 
+            document.getElementById("filter-search").value = "";
+            document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('input[name="date-range"][value="7"]').checked = true;
+            document.getElementById("current-period-text").textContent = "최근 7일";
+            applyFilter();
+        }
+
+        function applyFilter() {
+            const searchVal = document.getElementById("filter-search").value.toLowerCase();
+            const today = new Date();
+            let dateCutoff = null;
+            
+            // 날짜 비교 (자정 기준)
+            today.setHours(0,0,0,0);
+
+            if (currentDateRange !== "ALL") {
+                dateCutoff = new Date(today);
+                dateCutoff.setDate(today.getDate() - (parseInt(currentDateRange) - 1));
+            }
+
+            filteredData = rawData.filter(item => {
+                if (dateCutoff && item.dateObj < dateCutoff) return false;
+                
+                let groupMatch = true;
+                if (currentKeywordFilter.startsWith("GROUP:")) {
+                    const groupName = currentKeywordFilter.split(":")[1];
+                    const keywords = KEYWORD_GROUPS[groupName];
+                    groupMatch = keywords.some(k => item.keyword.includes(k) || k.includes(item.keyword));
+                } else if (currentKeywordFilter !== "ALL") {
+                    groupMatch = item.keyword.includes(currentKeywordFilter) || currentKeywordFilter.includes(item.keyword);
+                }
+
+                const searchMatch = item.title.toLowerCase().includes(searchVal) || 
+                                    item.keyword.toLowerCase().includes(searchVal);
+                return groupMatch && searchMatch;
+            });
+
+            renderDashboard();
+        }
+
+        // 4. 렌더링
+        function renderDashboard() {
+            const data = filteredData;
+            const total = data.length;
+            const redCount = data.filter(d => d.risk === 'RED').length;
+            const amberCount = data.filter(d => d.risk === 'AMBER').length;
+            
+            // AI Summary
+            const summaryContainer = document.getElementById("ai-summary-content");
+            let summaryHTML = "";
+
+            if (total === 0) {
+                summaryHTML = `<p class="text-slate-400">🔍 선택된 조건에 맞는 데이터가 없습니다.</p>`;
+            } else {
+                const kwCounts = {};
+                data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
+                const topKw = Object.entries(kwCounts).sort((a,b)=>b[1]-a[1])[0][0];
+                
+                const criticalItems = data.filter(d => d.risk === 'RED');
+                const uniqueCriticals = [];
+                const seenTitles = new Set();
+                criticalItems.forEach(d => {
+                    if(!seenTitles.has(d.title)) { seenTitles.add(d.title); uniqueCriticals.push(d); }
+                });
+
+                let statusMsg = "", statusColor = "text-green-400";
+                if (redCount > 2) { statusMsg = "🚨 [심각] 다수의 위협이 탐지되었습니다."; statusColor = "text-red-400 font-bold"; }
+                else if (redCount > 0) { statusMsg = "⚠️ [주의] 위협 요소 모니터링 필요."; statusColor = "text-amber-400 font-bold"; }
+                else { statusMsg = "✅ [안정] 특이사항 없습니다."; }
+
+                summaryHTML += `<p class="mb-3 ${statusColor}">${statusMsg}</p>`;
+                summaryHTML += `<p class="mb-3">선택 기간 총 <strong>${total}건</strong>, <span class="text-blue-200">"${topKw}"</span> 이슈 우세.</p>`;
+
+                if (uniqueCriticals.length > 0) {
+                    summaryHTML += `<div class="bg-white/5 rounded-lg p-3 border border-white/10 mt-2">
+                        <p class="text-xs text-red-300 font-bold mb-2 uppercase">🔴 주요 위협 브리핑</p>
+                        <ul class="space-y-1 text-sm text-slate-300 list-disc list-inside">`;
+                    uniqueCriticals.slice(0, 3).forEach(item => {
+                        summaryHTML += `<li>${item.title.substring(0, 45)}${item.title.length>45?'...':''}</li>`;
+                    });
+                    summaryHTML += `</ul></div>`;
+                }
+            }
+            summaryContainer.innerHTML = summaryHTML;
+
+            // KPIs
+            document.getElementById("kpi-total").textContent = total.toLocaleString();
+            document.getElementById("kpi-red").textContent = redCount;
+            document.getElementById("kpi-amber").textContent = amberCount;
+            
+            const kwCounts = {};
+            data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
+            const topKw = Object.entries(kwCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "-";
+            document.getElementById("kpi-keyword").textContent = topKw;
+            document.getElementById("list-count").textContent = total;
+
+            // List Render
+            const listContainer = document.getElementById("news-list");
+            listContainer.innerHTML = "";
+            const displayedTitles = new Set();
+
+            // 오늘 날짜 문자열 (YYYY-MM-DD)
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            if (total === 0) {
+                listContainer.innerHTML = `<div class="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">데이터가 없습니다.</div>`;
+            } else {
+                data.forEach(d => {
+                    if(displayedTitles.has(d.title)) return;
+                    displayedTitles.add(d.title);
+
+                    const el = document.createElement("a");
+                    el.href = d.link; el.target = "_blank";
+                    el.className = "block dashboard-card p-5 group no-underline relative overflow-hidden mb-3 hover:border-blue-400";
+                    const badgeClass = `badge-${d.risk}`;
+                    
+                    // NEW 뱃지 로직
+                    const isToday = d.date === todayStr;
+                    const newBadge = isToday ? `<span class="badge-new">NEW</span>` : "";
+
+                    el.innerHTML = `
+                        <div class="flex justify-between items-start gap-3 relative z-10">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                    <span class="badge ${badgeClass}">${d.risk}</span>
+                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wide">${d.keyword}</span>
+                                    ${newBadge}
+                                </div>
+                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">${d.title}</h4>
+                                <div class="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
+                                    <i class="ph-bold ph-calendar-blank"></i> 
+                                    <span class="font-bold text-slate-500">보도일자: ${d.date}</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded-lg group-hover:bg-blue-50 transition-colors self-center">
+                                <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500"></i>
+                            </div>
+                        </div>
+                    `;
+                    listContainer.appendChild(el);
+                });
+            }
+            updateCharts(data);
+        }
+
+        function updateCharts(data) {
+            const rCounts = { RED: 0, AMBER: 0, GREEN: 0 };
+            data.forEach(d => {
+                if (rCounts[d.risk] !== undefined) rCounts[d.risk]++;
+                else rCounts['GREEN']++;
+            });
+
+            const ctxRisk = document.getElementById("riskChart");
+            if (charts.risk) charts.risk.destroy();
+
+            charts.risk = new Chart(ctxRisk, {
+                type: "doughnut",
+                data: {
+                    labels: ["Critical", "Warning", "Safe"],
+                    datasets: [{
+                        data: [rCounts.RED, rCounts.AMBER, rCounts.GREEN],
+                        backgroundColor: ["#ef4444", "#f59e0b", "#22c55e"],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: "75%",
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Pretendard', size: 11 } } } }
+                }
+            });
+        }
+
+        document.getElementById("filter-search").addEventListener("input", applyFilter);
     </script>
 </body>
 </html>
-"""
-
-# ---------------------------------------------------------
-# [4] 데이터 주입 및 파일 저장
-# ---------------------------------------------------------
-final_html = html_template.replace("__DATA_B64__", b64_data)
-final_html = final_html.replace("__KW_B64__", b64_kw)
-
-with open(OUTPUT_FILENAME, 'w', encoding='utf-8') as f:
-    f.write(final_html)
-
-print(f"✨ 생성 완료: {OUTPUT_FILENAME}")
-print("1. 생성된 index.html 파일을 깃허브에 올리세요.")
-print("2. 이제 로딩 화면에서 절대 멈추지 않습니다.")
