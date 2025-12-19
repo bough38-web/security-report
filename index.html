@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Security Insight Pro - Report Date</title>
+    <title>Security Insight Pro - Clean View</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -64,11 +64,7 @@
             border-radius: 4px; font-weight: 800; animation: pulse 2s infinite; 
             display: inline-flex; align-items: center; gap: 2px;
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
         #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
     </style>
@@ -241,7 +237,7 @@
         let currentKeywordFilter = "ALL";
         let currentDateRange = "7";
 
-        // 1. 데이터 로드 및 정렬
+        // 1. 데이터 로드
         Papa.parse("data.csv", {
             download: true,
             header: true,
@@ -261,7 +257,7 @@
                     })
                     .filter(item => item.title && !isNaN(item.dateObj)); 
 
-                // ★ 중요: 날짜 최신순 정렬 (내림차순)
+                // 날짜 최신순 정렬
                 rawData.sort((a, b) => b.dateObj - a.dateObj);
                 
                 document.getElementById("loader").style.display = "none";
@@ -275,6 +271,7 @@
             }
         });
 
+        // 2. 그룹 버튼 렌더링
         function renderGroupButtons() {
             const container = document.getElementById("group-filter-container");
             container.innerHTML = "";
@@ -349,16 +346,14 @@
             const today = new Date();
             let dateCutoff = null;
             
-            // 날짜 비교 (시간 무시하고 날짜로만 비교하기 위해 setHours 처리)
             today.setHours(0,0,0,0);
 
             if (currentDateRange !== "ALL") {
                 dateCutoff = new Date(today);
-                dateCutoff.setDate(today.getDate() - (parseInt(currentDateRange) - 1)); // -1은 당일 포함 계산
+                dateCutoff.setDate(today.getDate() - (parseInt(currentDateRange) - 1));
             }
 
             filteredData = rawData.filter(item => {
-                // 날짜 필터 (날짜 객체 기준 비교)
                 if (dateCutoff && item.dateObj < dateCutoff) return false;
                 
                 let groupMatch = true;
@@ -437,8 +432,6 @@
             const listContainer = document.getElementById("news-list");
             listContainer.innerHTML = "";
             const displayedTitles = new Set();
-
-            // 오늘 날짜 문자열 (YYYY-MM-DD)
             const todayStr = new Date().toISOString().split('T')[0];
 
             if (total === 0) {
@@ -452,11 +445,10 @@
                     el.href = d.link; el.target = "_blank";
                     el.className = "block dashboard-card p-5 group no-underline relative overflow-hidden mb-3 hover:border-blue-400";
                     const badgeClass = `badge-${d.risk}`;
-                    
-                    // 오늘 나온 기사는 NEW 뱃지 표시
                     const isToday = d.date === todayStr;
                     const newBadge = isToday ? `<span class="badge-new">NEW</span>` : "";
 
+                    // ★ 수정: 날짜 텍스트 제거됨
                     el.innerHTML = `
                         <div class="flex justify-between items-start gap-3 relative z-10">
                             <div class="flex-1 min-w-0">
@@ -466,10 +458,6 @@
                                     ${newBadge}
                                 </div>
                                 <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">${d.title}</h4>
-                                <div class="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
-                                    <i class="ph-bold ph-calendar-blank"></i> 
-                                    <span class="font-bold text-slate-500">보도일자: ${d.date}</span>
-                                </div>
                             </div>
                             <div class="bg-slate-50 p-2 rounded-lg group-hover:bg-blue-50 transition-colors self-center">
                                 <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500"></i>
