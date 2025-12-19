@@ -3,65 +3,83 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Security Insight Pro</title>
+    <title>Security Insight Pro - 7 Days</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
 
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; color: #334155; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f0f4f8; color: #1e293b; }
         
-        /* 커스텀 스크롤바 */
+        /* 스크롤바 커스텀 */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* 글래스 효과 카드 */
-        .glass-card {
+        /* 고급 카드 스타일 (Glassmorphism + Shadow) */
+        .dashboard-card {
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            transition: all 0.2s ease-in-out;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .glass-card:hover {
+        .dashboard-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
             border-color: #cbd5e1;
         }
 
-        /* 뱃지 스타일 */
-        .badge { padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; border: 1px solid transparent; }
-        .badge-RED { background-color: #fef2f2; color: #dc2626; border-color: #fecaca; }
-        .badge-AMBER { background-color: #fffbeb; color: #d97706; border-color: #fde68a; }
-        .badge-GREEN { background-color: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+        /* 키워드 그룹 버튼 스타일 */
+        .group-label { font-size: 0.7rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .kw-btn {
+            font-size: 0.8rem; padding: 6px 12px; border-radius: 8px; 
+            background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+            transition: all 0.2s; cursor: pointer; font-weight: 500;
+        }
+        .kw-btn:hover { background: #e2e8f0; color: #1e293b; }
+        .kw-btn.active { background: #3b82f6; color: white; border-color: #2563eb; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
+
+        /* 리스크 뱃지 */
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
+        .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-AMBER { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+
+        /* 로딩 애니메이션 */
+        #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
     </style>
 </head>
 
 <body class="antialiased">
 
-    <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 shadow-lg backdrop-blur-md bg-opacity-90">
+    <div id="loader">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p class="text-slate-600 font-bold animate-pulse">최근 7일 데이터 분석 중...</p>
+    </div>
+
+    <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 shadow-xl backdrop-blur-md bg-opacity-95 border-b border-slate-700">
         <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <i class="ph-fill ph-shield-check text-2xl text-blue-400"></i>
+                <div class="bg-blue-600 p-1.5 rounded-lg">
+                    <i class="ph-bold ph-shield-check text-xl"></i>
+                </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-tight">Security Insight <span class="text-blue-400">Pro</span></h1>
-                    <p class="text-[10px] text-slate-400 uppercase tracking-widest leading-none">Intelligence Dashboard</p>
+                    <h1 class="font-bold text-lg tracking-tight leading-none">Security Insight <span class="text-blue-400">Pro</span></h1>
+                    <p class="text-[10px] text-slate-400 font-medium tracking-wider mt-0.5">WEEKLY INTELLIGENCE REPORT</p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <div class="hidden md:flex items-center gap-2 text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                <div class="hidden md:flex items-center gap-2 text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-600 text-slate-300">
                     <span class="relative flex h-2 w-2">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
-                    Live Connection
+                    Live Data (Last 7 Days)
                 </div>
             </div>
         </div>
@@ -69,98 +87,99 @@
 
     <div class="max-w-7xl mx-auto p-6 space-y-6">
 
-        <div class="glass-card p-6 bg-gradient-to-r from-slate-800 to-slate-900 border-none text-white relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-64 h-full bg-blue-500 opacity-10 blur-3xl transform translate-x-1/2"></div>
-            <div class="relative z-10 flex flex-col md:flex-row gap-6 items-start">
-                <div class="shrink-0 p-3 bg-white/10 rounded-xl">
-                    <i class="ph-duotone ph-robot text-3xl text-blue-300"></i>
-                </div>
-                <div>
-                    <h2 class="font-bold text-lg mb-2 flex items-center gap-2">AI Analysis Report</h2>
-                    <p id="summary" class="text-slate-300 text-sm leading-relaxed">데이터 분석 대기 중...</p>
+        <div class="dashboard-card p-0 overflow-hidden border-none relative">
+            <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white relative z-10">
+                <div class="flex flex-col md:flex-row gap-6 items-start">
+                    <div class="shrink-0 p-3 bg-white/10 rounded-xl backdrop-blur-md border border-white/10">
+                        <i class="ph-duotone ph-robot text-3xl text-blue-300"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="font-bold text-lg mb-2 flex items-center gap-2 text-blue-100">
+                            AI Executive Summary
+                            <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">BETA</span>
+                        </h2>
+                        <p id="ai-summary" class="text-slate-300 text-sm leading-relaxed font-light">
+                            데이터 분석 대기 중...
+                        </p>
+                    </div>
                 </div>
             </div>
+            <div class="absolute top-0 right-0 w-96 h-full bg-blue-500 opacity-10 blur-3xl transform translate-x-1/3 pointer-events-none"></div>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="glass-card p-5 border-l-4 border-blue-500">
-                <div class="flex justify-between items-start">
-                    <p class="text-xs font-bold text-slate-500 uppercase">Total Articles</p>
-                    <i class="ph-duotone ph-article text-xl text-blue-500"></i>
+            <div class="dashboard-card p-5 border-l-4 border-blue-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Weekly News</span>
+                    <i class="ph-duotone ph-newspaper text-2xl text-blue-500/50"></i>
                 </div>
-                <p id="kpi-total" class="text-3xl font-bold text-slate-800 mt-2">-</p>
+                <h3 id="kpi-total" class="text-3xl font-bold text-slate-800">-</h3>
             </div>
-            <div class="glass-card p-5 border-l-4 border-red-500">
-                <div class="flex justify-between items-start">
-                    <p class="text-xs font-bold text-red-600 uppercase">Critical (Red)</p>
-                    <i class="ph-duotone ph-siren text-xl text-red-500"></i>
+            <div class="dashboard-card p-5 border-l-4 border-red-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-red-600 uppercase tracking-wider">Critical</span>
+                    <i class="ph-duotone ph-warning-octagon text-2xl text-red-500/50"></i>
                 </div>
-                <p id="kpi-red" class="text-3xl font-bold text-red-600 mt-2">-</p>
+                <h3 id="kpi-red" class="text-3xl font-bold text-red-600">-</h3>
             </div>
-            <div class="glass-card p-5 border-l-4 border-amber-500">
-                <div class="flex justify-between items-start">
-                    <p class="text-xs font-bold text-amber-600 uppercase">Warning (Amber)</p>
-                    <i class="ph-duotone ph-warning text-xl text-amber-500"></i>
+            <div class="dashboard-card p-5 border-l-4 border-amber-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">Warning</span>
+                    <i class="ph-duotone ph-siren text-2xl text-amber-500/50"></i>
                 </div>
-                <p id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</p>
+                <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600">-</h3>
             </div>
-            <div class="glass-card p-5 border-l-4 border-green-500">
-                <div class="flex justify-between items-start">
-                    <p class="text-xs font-bold text-green-600 uppercase">Top Keyword</p>
-                    <i class="ph-duotone ph-trend-up text-xl text-green-500"></i>
+            <div class="dashboard-card p-5 border-l-4 border-green-500">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-green-600 uppercase tracking-wider">Top Issue</span>
+                    <i class="ph-duotone ph-trend-up text-2xl text-green-500/50"></i>
                 </div>
-                <p id="kpi-keyword" class="text-xl font-bold text-green-700 mt-3 truncate">-</p>
+                <h3 id="kpi-keyword" class="text-lg font-bold text-green-700 mt-2 truncate">-</h3>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             <div class="lg:col-span-4 space-y-6">
-                <div class="glass-card p-5 sticky top-20">
-                    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-                        <i class="ph-bold ph-faders text-slate-500"></i>
-                        <h3 class="font-bold text-sm text-slate-700">Filter & Search</h3>
+                
+                <div class="dashboard-card p-5 sticky top-20 z-30">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                        <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                            <i class="ph-bold ph-funnel text-slate-500"></i> Smart Filter
+                        </h3>
+                        <button onclick="resetFilter()" class="text-xs text-slate-400 hover:text-blue-500 underline">초기화</button>
                     </div>
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">키워드 (Keyword)</label>
-                            <div class="relative">
-                                <select id="filter-keyword" class="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 appearance-none cursor-pointer">
-                                    <option value="all">All Keywords</option>
-                                </select>
-                                <i class="ph-bold ph-caret-down absolute right-3 top-2.5 text-slate-400 pointer-events-none"></i>
-                            </div>
+
+                    <div class="space-y-4" id="group-filter-container">
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">검색 (Search)</label>
-                            <div class="relative">
-                                <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
-                                <input id="filter-search" type="text" placeholder="제목 검색..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500">
-                            </div>
+
+                    <div class="mt-6 pt-4 border-t border-slate-100">
+                        <label class="block text-xs font-bold text-slate-400 mb-2">DETAIL SEARCH</label>
+                        <div class="relative">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
+                            <input id="filter-search" type="text" placeholder="제목/키워드 검색..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none transition-all">
                         </div>
                     </div>
                 </div>
 
-                <div class="glass-card p-5">
+                <div class="dashboard-card p-5">
                     <h3 class="font-bold text-xs text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <i class="ph-fill ph-chart-pie-slice"></i> Risk Distribution
+                        <i class="ph-fill ph-chart-pie-slice"></i> Risk Share
                     </h3>
                     <div class="h-48 relative"><canvas id="riskChart"></canvas></div>
-                </div>
-
-                <div class="glass-card p-5">
-                    <h3 class="font-bold text-xs text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <i class="ph-fill ph-chart-line-up"></i> Daily Trend
-                    </h3>
-                    <div class="h-40 relative"><canvas id="trendChart"></canvas></div>
                 </div>
             </div>
 
             <div class="lg:col-span-8">
                 <div class="flex items-end justify-between mb-4 px-1">
-                    <h3 class="font-bold text-lg text-slate-800">News Feed</h3>
-                    <span id="list-count" class="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500 shadow-sm">Loading...</span>
+                    <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                        Weekly Feed
+                        <span id="list-count" class="text-xs font-bold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500 shadow-sm">0</span>
+                    </h3>
+                    <div class="text-xs text-slate-400 flex gap-2">
+                        <span><i class="ph-fill ph-circle text-red-500"></i> Critical</span>
+                        <span><i class="ph-fill ph-circle text-amber-500"></i> Warning</span>
+                    </div>
                 </div>
                 <div id="news-list" class="space-y-3">
                     </div>
@@ -168,116 +187,228 @@
         </div>
 
         <footer class="text-center text-xs text-slate-400 py-8 border-t border-slate-200 mt-8">
-            &copy; 2025 Security Insight Pro Dashboard. All rights reserved.
+            &copy; 2025 Security Insight Pro. Powered by AI Analysis.
         </footer>
 
     </div>
 
     <script>
+        // --- 설정: 키워드 그룹 정의 ---
+        const KEYWORD_GROUPS = {
+            "무인경비": ["KT텔레캅", "에스원", "SK쉴더스", "CCTV", "보안관제"],
+            "통신/테크": ["KT", "SK", "LG", "애플", "아이폰", "갤럭시", "삼성"],
+            "안전/사고": ["안전사고", "산업재해", "화재", "폭발", "중대재해", "붕괴"],
+            "보안/기타": ["해킹", "개인정보", "유출", "랜섬웨어", "보안", "피싱"]
+        };
+
         let rawData = [];
         let filteredData = [];
-        let charts = {}; // 차트 인스턴스 저장
+        let charts = {};
+        let currentFilter = "ALL"; // 현재 선택된 필터 (그룹명 또는 키워드)
 
-        // 1. 데이터 로드 (PapaParse 사용)
+        // --- 1. 데이터 로드 및 7일 필터링 ---
         Papa.parse("data.csv", {
             download: true,
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                // 데이터 전처리
-                rawData = results.data.map(item => ({
-                    keyword: item.keyword ? item.keyword.trim() : "",
-                    title: item.title ? item.title.trim() : "",
-                    link: (item.link && item.link.trim()) ? item.link.trim() : "#",
-                    // 날짜 필드가 여러개일 경우 date_fmt 우선 사용
-                    date: (item.date_fmt || item.date || "Unknown").trim(),
-                    risk: item.risk ? item.risk.trim().toUpperCase() : "GREEN"
-                }));
+                const today = new Date();
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(today.getDate() - 7);
 
-                // 초기화 실행
-                initFilters();
-                filterData();
+                // 데이터 전처리 및 날짜 필터링
+                rawData = results.data
+                    .map(item => {
+                        const dateStr = item.date_fmt || item.date || "";
+                        return {
+                            keyword: item.keyword ? item.keyword.trim() : "기타",
+                            title: item.title ? item.title.trim() : "",
+                            link: (item.link && item.link.trim()) ? item.link.trim() : "#",
+                            date: dateStr,
+                            risk: item.risk ? item.risk.trim().toUpperCase() : "GREEN",
+                            dateObj: new Date(dateStr)
+                        };
+                    })
+                    // 7일 이내 데이터만 통과 & 유효한 제목
+                    .filter(item => item.title && !isNaN(item.dateObj) && item.dateObj >= sevenDaysAgo);
+
+                // 날짜 최신순 정렬
+                rawData.sort((a, b) => b.dateObj - a.dateObj);
+
+                document.getElementById("loader").style.display = "none";
+                
+                // 초기화
+                renderGroupButtons();
+                applyFilter();
             },
             error: function(err) {
-                document.getElementById("summary").textContent = "데이터 로드 실패: CSV 파일을 확인해주세요.";
-                console.error("PapaParse Error:", err);
+                document.getElementById("loader").style.display = "none";
+                document.getElementById("ai-summary").textContent = "데이터 로드 실패. CSV 파일을 확인해주세요.";
             }
         });
 
-        // 2. 필터 초기화
-        function initFilters() {
-            const keywordSet = new Set(rawData.map(d => d.keyword).filter(k => k));
-            const select = document.getElementById("filter-keyword");
-            [...keywordSet].sort().forEach(k => {
-                const opt = document.createElement("option");
-                opt.value = k;
-                opt.textContent = k.toUpperCase();
-                select.appendChild(opt);
-            });
+        // --- 2. 그룹형 버튼 렌더링 ---
+        function renderGroupButtons() {
+            const container = document.getElementById("group-filter-container");
+            container.innerHTML = "";
 
-            // 이벤트 리스너 등록
-            document.getElementById("filter-keyword").addEventListener("change", filterData);
-            document.getElementById("filter-search").addEventListener("input", filterData);
+            // 존재하는 키워드만 추출해서 그룹핑
+            const presentKeywords = new Set(rawData.map(d => d.keyword));
+
+            Object.keys(KEYWORD_GROUPS).forEach(groupName => {
+                // 해당 그룹에 속하는 데이터가 하나라도 있을 때만 표시
+                const groupKeywords = KEYWORD_GROUPS[groupName].filter(k => 
+                    [...presentKeywords].some(pk => pk.includes(k) || k.includes(pk))
+                );
+
+                if (groupKeywords.length > 0) {
+                    const groupDiv = document.createElement("div");
+                    
+                    const label = document.createElement("div");
+                    label.className = "group-label";
+                    label.textContent = groupName;
+                    groupDiv.appendChild(label);
+
+                    const btnWrap = document.createElement("div");
+                    btnWrap.className = "flex flex-wrap gap-2";
+
+                    // 그룹 전체 보기 버튼
+                    const groupBtn = document.createElement("button");
+                    groupBtn.className = "kw-btn";
+                    groupBtn.dataset.val = `GROUP:${groupName}`;
+                    groupBtn.textContent = "전체";
+                    groupBtn.onclick = () => setFilter(`GROUP:${groupName}`, groupBtn);
+                    btnWrap.appendChild(groupBtn);
+
+                    // 개별 키워드 버튼
+                    groupKeywords.forEach(kw => {
+                        // 실제 데이터에 있는 키워드만 버튼 생성 (매칭 로직 완화)
+                        const isExist = [...presentKeywords].some(pk => pk.includes(kw) || kw.includes(pk));
+                        if(isExist) {
+                            const btn = document.createElement("button");
+                            btn.className = "kw-btn";
+                            btn.dataset.val = kw;
+                            btn.textContent = kw;
+                            btn.onclick = () => setFilter(kw, btn);
+                            btnWrap.appendChild(btn);
+                        }
+                    });
+
+                    groupDiv.appendChild(btnWrap);
+                    container.appendChild(groupDiv);
+                }
+            });
         }
 
-        // 3. 데이터 필터링 및 렌더링 트리거
-        function filterData() {
-            const kVal = document.getElementById("filter-keyword").value;
-            const sVal = document.getElementById("filter-search").value.toLowerCase();
+        // --- 3. 필터링 로직 ---
+        function setFilter(val, btnElement) {
+            currentFilter = val;
+            
+            // 버튼 활성 상태 스타일 변경
+            document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+
+            applyFilter();
+        }
+
+        function resetFilter() {
+            currentFilter = "ALL";
+            document.getElementById("filter-search").value = "";
+            document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
+            applyFilter();
+        }
+
+        function applyFilter() {
+            const searchVal = document.getElementById("filter-search").value.toLowerCase();
 
             filteredData = rawData.filter(item => {
-                const matchK = kVal === "all" || item.keyword === kVal;
-                const matchS = item.title.toLowerCase().includes(sVal);
-                return matchK && matchS;
+                // 1. 그룹/키워드 필터
+                let groupMatch = true;
+                if (currentFilter.startsWith("GROUP:")) {
+                    const groupName = currentFilter.split(":")[1];
+                    const keywords = KEYWORD_GROUPS[groupName];
+                    groupMatch = keywords.some(k => item.keyword.includes(k) || k.includes(item.keyword));
+                } else if (currentFilter !== "ALL") {
+                    groupMatch = item.keyword.includes(currentFilter) || currentFilter.includes(item.keyword);
+                }
+
+                // 2. 검색창 필터
+                const searchMatch = item.title.toLowerCase().includes(searchVal) || 
+                                    item.keyword.toLowerCase().includes(searchVal);
+
+                return groupMatch && searchMatch;
             });
 
             renderDashboard();
         }
 
-        // 4. 대시보드 렌더링 (메인 함수)
+        // --- 4. 대시보드 렌더링 ---
         function renderDashboard() {
             const data = filteredData;
 
-            // [Summary]
-            const topRisk = data.filter(d => d.risk === 'RED').length;
-            const summaryHTML = topRisk > 0 
-                ? `현재 로드된 <strong>${data.length}건</strong> 중 <span class="text-red-400 font-bold">RED(Critical) 등급이 ${topRisk}건</span> 감지되었습니다. 즉각적인 확인이 필요합니다.`
-                : `현재 로드된 <strong>${data.length}건</strong>의 데이터가 모두 정상 범위 내에 있거나 주의 단계입니다.`;
-            document.getElementById("summary").innerHTML = summaryHTML;
+            // [AI Summary Logic - 중복제거 및 스마트 요약]
+            const total = data.length;
+            const redCount = data.filter(d => d.risk === 'RED').length;
+            
+            // 중복 제목 제거 (유사도 체크는 아니지만 동일 제목 방지)
+            const uniqueTitles = [...new Set(data.map(d => d.title))];
+            
+            let summaryText = "";
+            if (total === 0) {
+                summaryText = "최근 7일간 해당 조건에 맞는 데이터가 없습니다.";
+            } else {
+                // 가장 많이 등장한 키워드 찾기
+                const kwCounts = {};
+                data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
+                const topKw = Object.entries(kwCounts).sort((a,b)=>b[1]-a[1])[0][0];
+
+                if (redCount > 0) {
+                    summaryText = `최근 7일간 <span class="text-red-400 font-bold">심각(Critical) 이슈가 ${redCount}건</span> 발생했습니다. 주로 <strong>'${topKw}'</strong> 관련 내용이며, 즉각적인 모니터링이 필요합니다.`;
+                } else {
+                    summaryText = `최근 7일간 총 ${total}건의 뉴스가 수집되었습니다. <strong>'${topKw}'</strong> 키워드가 가장 활발하며, 전반적으로 특이사항 없는 안정적인 상태입니다.`;
+                }
+            }
+            document.getElementById("ai-summary").innerHTML = summaryText;
 
             // [KPIs]
-            document.getElementById("kpi-total").textContent = data.length.toLocaleString();
-            document.getElementById("kpi-red").textContent = data.filter(d => d.risk === "RED").length.toLocaleString();
-            document.getElementById("kpi-amber").textContent = data.filter(d => d.risk === "AMBER").length.toLocaleString();
+            document.getElementById("kpi-total").textContent = total.toLocaleString();
+            document.getElementById("kpi-red").textContent = redCount;
+            document.getElementById("kpi-amber").textContent = data.filter(d => d.risk === "AMBER").length;
+            
+            const kwCounts = {};
+            data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
+            const topKw = Object.entries(kwCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "-";
+            document.getElementById("kpi-keyword").textContent = topKw;
+            document.getElementById("list-count").textContent = total;
 
-            const kwCount = {};
-            data.forEach(d => kwCount[d.keyword] = (kwCount[d.keyword] || 0) + 1);
-            const topKw = Object.entries(kwCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
-            document.getElementById("kpi-keyword").textContent = topKw.toUpperCase();
-            document.getElementById("list-count").textContent = `Total: ${data.length} results`;
-
-            // [List]
+            // [List Render]
             const listContainer = document.getElementById("news-list");
             listContainer.innerHTML = "";
-            
-            if (data.length === 0) {
-                listContainer.innerHTML = `<div class="text-center py-10 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">검색 결과가 없습니다.</div>`;
+
+            if (total === 0) {
+                listContainer.innerHTML = `<div class="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">데이터가 없습니다.</div>`;
             } else {
+                // 중복 제목은 흐릿하게 처리하거나 제외할 수도 있음. 여기서는 다 보여주되 시각적 구분을 둠.
+                const displayedTitles = new Set();
+                
                 data.forEach(d => {
+                    // 완전 동일 제목은 스킵 (AI 기능 흉내: 중복 제거)
+                    if(displayedTitles.has(d.title)) return;
+                    displayedTitles.add(d.title);
+
                     const el = document.createElement("a");
                     el.href = d.link;
                     el.target = "_blank";
-                    el.className = "block glass-card p-5 group no-underline relative overflow-hidden";
+                    el.className = "block dashboard-card p-5 group no-underline relative overflow-hidden mb-3 hover:border-blue-400";
                     
-                    // Risk Badge Color Logic
-                    const badgeClass = `badge-${d.risk}`; // badge-RED, badge-GREEN etc.
+                    const badgeClass = `badge-${d.risk}`;
 
                     el.innerHTML = `
                         <div class="flex justify-between items-start gap-3 relative z-10">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-2 flex-wrap">
                                     <span class="badge ${badgeClass}">${d.risk}</span>
-                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wide">${d.keyword.toUpperCase()}</span>
+                                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wide">${d.keyword}</span>
                                     <span class="text-xs text-slate-400 flex items-center gap-1 font-mono">
                                         <i class="ph-bold ph-calendar-blank"></i> ${d.date}
                                     </span>
@@ -285,9 +416,6 @@
                                 <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
                                     ${d.title}
                                 </h4>
-                                <div class="mt-2 flex items-center gap-1 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <i class="ph-bold ph-link"></i> 원문 보러가기
-                                </div>
                             </div>
                             <div class="bg-slate-50 p-2 rounded-lg group-hover:bg-blue-50 transition-colors">
                                 <i class="ph-bold ph-arrow-up-right text-slate-400 group-hover:text-blue-500"></i>
@@ -298,26 +426,17 @@
                 });
             }
 
-            // [Charts]
             updateCharts(data);
         }
 
-        // 5. 차트 업데이트 로직
+        // --- 5. 차트 업데이트 ---
         function updateCharts(data) {
-            // 데이터 집계
             const rCounts = { RED: 0, AMBER: 0, GREEN: 0 };
-            const dCounts = {}; // 날짜별 카운트
-
             data.forEach(d => {
                 if (rCounts[d.risk] !== undefined) rCounts[d.risk]++;
-                else rCounts['GREEN']++; // fallback
-
-                // 날짜 포맷 (YYYY-MM-DD 만 추출)
-                const dateKey = d.date.substring(0, 10);
-                dCounts[dateKey] = (dCounts[dateKey] || 0) + 1;
+                else rCounts['GREEN']++;
             });
 
-            // 5-1. Risk Doughnut Chart
             const ctxRisk = document.getElementById("riskChart");
             if (charts.risk) charts.risk.destroy();
 
@@ -329,7 +448,7 @@
                         data: [rCounts.RED, rCounts.AMBER, rCounts.GREEN],
                         backgroundColor: ["#ef4444", "#f59e0b", "#22c55e"],
                         borderWidth: 0,
-                        hoverOffset: 5
+                        hoverOffset: 10
                     }]
                 },
                 options: {
@@ -337,51 +456,14 @@
                     maintainAspectRatio: false,
                     cutout: "75%",
                     plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Pretendard' } } }
+                        legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Pretendard', size: 11 } } }
                     }
                 }
             });
-
-            // 5-2. Trend Line Chart (날짜 정렬)
-            const sortedDates = Object.keys(dCounts).sort();
-            const trendData = sortedDates.map(date => dCounts[date]);
-            
-            const ctxTrend = document.getElementById("trendChart");
-            if (charts.trend) charts.trend.destroy();
-
-            charts.trend = new Chart(ctxTrend, {
-                type: "line",
-                data: {
-                    labels: sortedDates,
-                    datasets: [{
-                        label: "Articles",
-                        data: trendData,
-                        borderColor: "#3b82f6",
-                        backgroundColor: (context) => {
-                            const ctx = context.chart.ctx;
-                            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                            gradient.addColorStop(0, "rgba(59, 130, 246, 0.2)");
-                            gradient.addColorStop(1, "rgba(59, 130, 246, 0)");
-                            return gradient;
-                        },
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 2,
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { display: false },
-                        y: { beginAtZero: true, display: false }
-                    },
-                    interaction: { mode: 'index', intersect: false }
-                }
-            });
         }
+
+        // 검색창 엔터키/입력 이벤트
+        document.getElementById("filter-search").addEventListener("input", applyFilter);
     </script>
 </body>
 </html>
