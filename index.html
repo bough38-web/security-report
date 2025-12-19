@@ -1,9 +1,7 @@
-# Final corrected execution: escape all JS braces safely by avoiding f-string conflicts
-
 import csv, json
 
-input_filename = "/mnt/data/data.csv"
-output_filename = "/mnt/data/index.html"
+input_filename = "data.csv"
+output_filename = "index.html"
 
 news_data = []
 
@@ -47,130 +45,73 @@ html = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Security Insight Dashboard</title>
+<title>Security Insight</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-50">
 
-<nav class="bg-slate-900 text-white px-6 h-14 flex items-center justify-between">
-  <div class="flex items-center gap-2 font-bold">
-    <i class="ph-fill ph-shield-check text-blue-400 text-xl"></i>
-    Security Insight
+<div class="max-w-7xl mx-auto p-6">
+  <div class="bg-slate-900 text-white rounded-xl p-6 mb-6">
+    <h2 class="text-lg font-bold mb-2">AI 인사이트</h2>
+    <p>
+      현재 <strong>__COUNT__건</strong>의 데이터가 로드되었습니다.
+      <span class="text-red-400 font-bold">RED</span> 이슈는 즉시 확인하세요.
+    </p>
   </div>
-  <span class="text-xs bg-slate-800 px-2 py-1 rounded">Live Dashboard</span>
-</nav>
 
-<div class="max-w-7xl mx-auto px-4 py-6">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white p-4 rounded border">
+      <p>Total</p><p id="kpi-total">-</p>
+    </div>
+    <div class="bg-white p-4 rounded border text-red-600">
+      <p>Critical</p><p id="kpi-red">-</p>
+    </div>
+    <div class="bg-white p-4 rounded border text-amber-600">
+      <p>Warning</p><p id="kpi-amber">-</p>
+    </div>
+    <div class="bg-white p-4 rounded border text-green-600">
+      <p>Top Keyword</p><p id="kpi-keyword">-</p>
+    </div>
+  </div>
 
-<div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl p-6 mb-6">
-  <h2 class="font-bold text-lg mb-2 flex items-center gap-2">
-    <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
-  </h2>
-  <p class="text-sm text-slate-300">
-    현재 <strong>__COUNT__건</strong>의 데이터가 로드되었습니다.
-    <span class="text-red-400 font-bold">RED</span> 이슈는 즉시 확인하세요.
-  </p>
-</div>
-
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-white p-4 rounded-xl border">
-    <p class="text-xs font-bold text-slate-500">Total</p>
-    <p id="kpi-total" class="text-2xl font-bold">-</p>
-  </div>
-  <div class="bg-white p-4 rounded-xl border border-red-200">
-    <p class="text-xs font-bold text-red-600">Critical</p>
-    <p id="kpi-red" class="text-2xl font-bold text-red-600">-</p>
-  </div>
-  <div class="bg-white p-4 rounded-xl border border-amber-200">
-    <p class="text-xs font-bold text-amber-600">Warning</p>
-    <p id="kpi-amber" class="text-2xl font-bold text-amber-600">-</p>
-  </div>
-  <div class="bg-white p-4 rounded-xl border border-green-200">
-    <p class="text-xs font-bold text-green-600">Top Keyword</p>
-    <p id="kpi-keyword" class="text-lg font-bold text-green-700 truncate">-</p>
-  </div>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <div class="bg-white p-5 rounded-xl border">
-    <h3 class="text-sm font-bold mb-4">Risk Share</h3>
-    <div class="h-48"><canvas id="riskChart"></canvas></div>
-  </div>
-  <div class="lg:col-span-2">
-    <h3 class="text-lg font-bold mb-4">뉴스 피드</h3>
-    <div id="news-list" class="space-y-3"></div>
-  </div>
-</div>
-
-<footer class="text-center text-xs text-slate-400 mt-12 py-6 border-t">
-  © 2025 Security Insight · GitHub Pages
-</footer>
-
+  <div id="news-list" class="space-y-3"></div>
 </div>
 
 <script>
 const rawData = __DATA__;
 
-function updateDashboard() {
-  document.getElementById("kpi-total").textContent = rawData.length;
-  document.getElementById("kpi-red").textContent = rawData.filter(d=>d.risk==="RED").length;
-  document.getElementById("kpi-amber").textContent = rawData.filter(d=>d.risk==="AMBER").length;
+document.getElementById("kpi-total").textContent = rawData.length;
+document.getElementById("kpi-red").textContent = rawData.filter(d=>d.risk==="RED").length;
+document.getElementById("kpi-amber").textContent = rawData.filter(d=>d.risk==="AMBER").length;
 
-  if(rawData.length>0) {
-    const counts={};
-    rawData.forEach(d=>counts[d.keyword]=(counts[d.keyword]||0)+1);
-    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
-    document.getElementById("kpi-keyword").textContent = top;
-  }
-
-  const list=document.getElementById("news-list");
-  list.innerHTML="";
-  rawData.forEach(item=>{
-    const el=document.createElement("a");
-    el.href=item.link;
-    el.target="_blank";
-    el.className="block bg-white border rounded-xl p-5 hover:shadow";
-
-    el.innerHTML =
-      '<div class="flex justify-between gap-4">' +
-        '<div>' +
-          '<div class="mb-2 text-xs font-bold">' +
-            '<span class="mr-2">'+item.risk+'</span>' +
-            '<span class="text-slate-500">'+item.keyword+'</span>' +
-          '</div>' +
-          '<h4 class="font-bold">'+item.title+'</h4>' +
-          '<p class="text-xs text-slate-400">'+item.date+'</p>' +
-        '</div>' +
-        '<i class="ph-bold ph-arrow-square-out text-slate-300 text-lg"></i>' +
-      '</div>';
-
-    list.appendChild(el);
-  });
-
-  const ctx=document.getElementById("riskChart");
-  if(ctx) {
-    const c={RED:0,AMBER:0,GREEN:0};
-    rawData.forEach(d=>c[d.risk]++);
-    new Chart(ctx,{
-      type:"doughnut",
-      data:{labels:["Red","Amber","Green"],datasets:[{data:[c.RED,c.AMBER,c.GREEN],backgroundColor:["#ef4444","#f59e0b","#22c55e"],borderWidth:0}]},
-      options:{cutout:"70%",plugins:{legend:{position:"right"}}}
-    });
-  }
+if(rawData.length){
+  const c={};
+  rawData.forEach(d=>c[d.keyword]=(c[d.keyword]||0)+1);
+  document.getElementById("kpi-keyword").textContent =
+    Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
 }
 
-updateDashboard();
+const list=document.getElementById("news-list");
+rawData.forEach(item=>{
+  const el=document.createElement("a");
+  el.href=item.link;
+  el.target="_blank";
+  el.className="block bg-white border rounded p-4";
+  el.innerHTML =
+    "<strong>"+item.title+"</strong><br>" +
+    "<span>"+item.keyword+" · "+item.date+" · "+item.risk+"</span>";
+  list.appendChild(el);
+});
 </script>
 
 </body>
 </html>
 """
 
-html = html.replace("__DATA__", json_payload).replace("__COUNT__", str(len(news_data)))
+html = html.replace("__DATA__", json_payload)
+html = html.replace("__COUNT__", str(len(news_data)))
 
 with open(output_filename, "w", encoding="utf-8") as f:
     f.write(html)
 
-output_filename
+print("index.html 생성 완료")
