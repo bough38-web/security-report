@@ -1,295 +1,176 @@
-import csv
-import json
-import os
+# Final corrected execution: escape all JS braces safely by avoiding f-string conflicts
 
-# --- [설정] 파일명 ---
-input_filename = 'data.csv'
-output_filename = 'index.html'
+import csv, json
 
-# --- [1] 데이터 읽기 ---
-print(f"🔄 '{input_filename}' 처리 중...")
+input_filename = "/mnt/data/data.csv"
+output_filename = "/mnt/data/index.html"
+
 news_data = []
 
 try:
-    with open(input_filename, mode='r', encoding='utf-8-sig') as csvfile:
-        reader = csv.DictReader(csvfile)
+    with open(input_filename, mode="r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
         if reader.fieldnames:
             reader.fieldnames = [h.strip() for h in reader.fieldnames]
 
         for row in reader:
-            title = row.get('title', '').strip()
-            if not title: continue 
+            title = row.get("title", "").strip()
+            if not title:
+                continue
 
-            link = row.get('link', '').strip()
-            if link and not link.startswith('http') and link != "#":
-                link = 'https://' + link
-            if not link: link = "#"
+            link = row.get("link", "").strip()
+            if link and not link.startswith("http") and link != "#":
+                link = "https://" + link
+            if not link:
+                link = "#"
 
-            date = row.get('date_fmt', '').strip()
-            if not date: date = row.get('date', '').strip()
-            
-            risk = row.get('risk', 'GREEN').strip().upper()
-            if risk not in ['RED', 'AMBER', 'GREEN']: risk = 'GREEN'
+            date = row.get("date_fmt", "").strip() or row.get("date", "").strip()
+            risk = row.get("risk", "GREEN").strip().upper()
+            if risk not in ["RED", "AMBER", "GREEN"]:
+                risk = "GREEN"
 
             news_data.append({
-                "keyword": row.get('keyword', '').strip(),
+                "keyword": row.get("keyword", "").strip(),
                 "title": title,
                 "link": link,
                 "date": date,
                 "risk": risk
             })
-    print(f"✅ 데이터 {len(news_data)}건 로드 완료")
-
 except FileNotFoundError:
-    print("❌ data.csv 파일이 없습니다.")
-    news_data = []
+    pass
 
-# --- [2] JSON 데이터 준비 ---
 json_payload = json.dumps(news_data, ensure_ascii=False)
 
-# --- [3] HTML 조립 (문자열 결합 방식) ---
-# Replace 함수를 쓰지 않고, 물리적으로 문자열을 결합하여 오류 가능성을 차단합니다.
-
-html_head = """
+html = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Insight Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
-        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-        .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-        .badge-AMBER { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
-        .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
-        #loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Insight Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
-<body>
-    <div id="loader">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-slate-500 font-bold">데이터 분석 중...</p>
-    </div>
-    
-    <nav class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
-        <div class="container mx-auto px-4 h-14 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
-                <span class="font-bold text-lg">Security Insight</span>
-            </div>
-            <span class="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-700">Live Dashboard</span>
-        </div>
-    </nav>
+<body class="bg-slate-50 text-slate-800">
 
-    <div class="container mx-auto px-4 py-6 max-w-7xl">
-        <div class="card p-6 mb-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
-            <h2 class="font-bold text-lg mb-2 flex items-center gap-2">
-                <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
-            </h2>
-            <p class="text-slate-300 text-sm">
-                현재 <strong><span id="total-txt">0</span>건</strong>의 데이터가 로드되었습니다. 
-                <span class="text-red-400 font-bold">RED 등급</span> 이슈는 즉시 확인 바랍니다.
-            </p>
-        </div>
+<nav class="bg-slate-900 text-white px-6 h-14 flex items-center justify-between">
+  <div class="flex items-center gap-2 font-bold">
+    <i class="ph-fill ph-shield-check text-blue-400 text-xl"></i>
+    Security Insight
+  </div>
+  <span class="text-xs bg-slate-800 px-2 py-1 rounded">Live Dashboard</span>
+</nav>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="card p-4 border-l-4 border-blue-500">
-                <p class="text-xs text-slate-500 font-bold">Total</p>
-                <p class="text-2xl font-bold" id="kpi-total">-</p>
-            </div>
-            <div class="card p-4 border-l-4 border-red-500 bg-red-50/20">
-                <p class="text-xs text-red-600 font-bold">Critical</p>
-                <p class="text-2xl font-bold text-red-600" id="kpi-red">-</p>
-            </div>
-            <div class="card p-4 border-l-4 border-amber-500">
-                <p class="text-xs text-amber-600 font-bold">Warning</p>
-                <p class="text-2xl font-bold text-amber-600" id="kpi-amber">-</p>
-            </div>
-            <div class="card p-4 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold">Top Keyword</p>
-                <p class="text-lg font-bold text-green-700 truncate" id="kpi-keyword">-</p>
-            </div>
-        </div>
+<div class="max-w-7xl mx-auto px-4 py-6">
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="space-y-6">
-                <div class="card p-5 sticky top-20">
-                    <h3 class="font-bold text-sm mb-4 border-b pb-2">필터링</h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">키워드</label>
-                            <select id="filter-keyword" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none"><option value="all">전체</option></select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">검색</label>
-                            <input id="filter-search" type="text" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none" placeholder="제목 검색...">
-                        </div>
-                    </div>
-                </div>
-                <div class="card p-5">
-                    <h3 class="font-bold text-xs mb-4 text-slate-500 uppercase">Risk Share</h3>
-                    <div class="h-48 relative"><canvas id="riskChart"></canvas></div>
-                </div>
-            </div>
+<div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl p-6 mb-6">
+  <h2 class="font-bold text-lg mb-2 flex items-center gap-2">
+    <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
+  </h2>
+  <p class="text-sm text-slate-300">
+    현재 <strong>__COUNT__건</strong>의 데이터가 로드되었습니다.
+    <span class="text-red-400 font-bold">RED</span> 이슈는 즉시 확인하세요.
+  </p>
+</div>
 
-            <div class="lg:col-span-2">
-                <div class="flex justify-between items-end mb-4">
-                    <h3 class="font-bold text-lg">뉴스 피드</h3>
-                    <span id="list-count" class="text-xs font-bold bg-white border px-2 py-1 rounded">0건</span>
-                </div>
-                <div id="news-list" class="space-y-3"></div>
-            </div>
-        </div>
-        <footer class="mt-12 text-center text-xs text-slate-400 py-8 border-t">Powered by GitHub Pages</footer>
-    </div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white p-4 rounded-xl border">
+    <p class="text-xs font-bold text-slate-500">Total</p>
+    <p id="kpi-total" class="text-2xl font-bold">-</p>
+  </div>
+  <div class="bg-white p-4 rounded-xl border border-red-200">
+    <p class="text-xs font-bold text-red-600">Critical</p>
+    <p id="kpi-red" class="text-2xl font-bold text-red-600">-</p>
+  </div>
+  <div class="bg-white p-4 rounded-xl border border-amber-200">
+    <p class="text-xs font-bold text-amber-600">Warning</p>
+    <p id="kpi-amber" class="text-2xl font-bold text-amber-600">-</p>
+  </div>
+  <div class="bg-white p-4 rounded-xl border border-green-200">
+    <p class="text-xs font-bold text-green-600">Top Keyword</p>
+    <p id="kpi-keyword" class="text-lg font-bold text-green-700 truncate">-</p>
+  </div>
+</div>
 
-    <script>
-        // ★ 데이터 직접 주입 (이 방식은 실패할 수 없음)
-        const rawData = 
-"""
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="bg-white p-5 rounded-xl border">
+    <h3 class="text-sm font-bold mb-4">Risk Share</h3>
+    <div class="h-48"><canvas id="riskChart"></canvas></div>
+  </div>
+  <div class="lg:col-span-2">
+    <h3 class="text-lg font-bold mb-4">뉴스 피드</h3>
+    <div id="news-list" class="space-y-3"></div>
+  </div>
+</div>
 
-html_tail = """;
-        
-        let filteredData = [...rawData];
+<footer class="text-center text-xs text-slate-400 mt-12 py-6 border-t">
+  © 2025 Security Insight · GitHub Pages
+</footer>
 
-        window.onload = function() {
-            document.getElementById('loader').style.display = 'none';
-            if (!rawData || rawData.length === 0) {
-                alert("데이터가 없습니다.");
-                return;
-            }
-            populateKeywords();
-            updateDashboard();
-        };
+</div>
 
-        function populateKeywords() {
-            const select = document.getElementById('filter-keyword');
-            const keywords = [...new Set(rawData.map(d => d.keyword))].filter(k => k).sort();
-            keywords.forEach(k => {
-                const opt = document.createElement('option');
-                opt.value = k;
-                opt.textContent = k;
-                select.appendChild(opt);
-            });
-        }
+<script>
+const rawData = __DATA__;
 
-        function updateDashboard() {
-            const kVal = document.getElementById('filter-keyword').value;
-            const sVal = document.getElementById('filter-search').value.toLowerCase();
+function updateDashboard() {
+  document.getElementById("kpi-total").textContent = rawData.length;
+  document.getElementById("kpi-red").textContent = rawData.filter(d=>d.risk==="RED").length;
+  document.getElementById("kpi-amber").textContent = rawData.filter(d=>d.risk==="AMBER").length;
 
-            filteredData = rawData.filter(item => {
-                const matchK = kVal === 'all' || item.keyword === kVal;
-                const matchS = item.title.toLowerCase().includes(sVal);
-                return matchK && matchS;
-            });
+  if(rawData.length>0) {
+    const counts={};
+    rawData.forEach(d=>counts[d.keyword]=(counts[d.keyword]||0)+1);
+    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+    document.getElementById("kpi-keyword").textContent = top;
+  }
 
-            renderKPIs();
-            renderList();
-            renderChart();
-        }
+  const list=document.getElementById("news-list");
+  list.innerHTML="";
+  rawData.forEach(item=>{
+    const el=document.createElement("a");
+    el.href=item.link;
+    el.target="_blank";
+    el.className="block bg-white border rounded-xl p-5 hover:shadow";
 
-        function renderKPIs() {
-            document.getElementById('total-txt').textContent = filteredData.length;
-            document.getElementById('kpi-total').textContent = filteredData.length;
-            document.getElementById('kpi-red').textContent = filteredData.filter(d => d.risk === 'RED').length;
-            document.getElementById('kpi-amber').textContent = filteredData.filter(d => d.risk === 'AMBER').length;
-            
-            if(filteredData.length > 0) {
-                const counts = {};
-                filteredData.forEach(d => counts[d.keyword] = (counts[d.keyword]||0)+1);
-                const top = Object.keys(counts).reduce((a,b)=>counts[a]>counts[b]?a:b);
-                document.getElementById('kpi-keyword').textContent = top;
-            } else {
-                document.getElementById('kpi-keyword').textContent = "-";
-            }
-            document.getElementById('list-count').textContent = filteredData.length + "건";
-        }
+    el.innerHTML =
+      '<div class="flex justify-between gap-4">' +
+        '<div>' +
+          '<div class="mb-2 text-xs font-bold">' +
+            '<span class="mr-2">'+item.risk+'</span>' +
+            '<span class="text-slate-500">'+item.keyword+'</span>' +
+          '</div>' +
+          '<h4 class="font-bold">'+item.title+'</h4>' +
+          '<p class="text-xs text-slate-400">'+item.date+'</p>' +
+        '</div>' +
+        '<i class="ph-bold ph-arrow-square-out text-slate-300 text-lg"></i>' +
+      '</div>';
 
-        function renderList() {
-            const container = document.getElementById('news-list');
-            container.innerHTML = '';
+    list.appendChild(el);
+  });
 
-            if(filteredData.length === 0) {
-                container.innerHTML = '<div class="p-8 text-center text-slate-400 border rounded">데이터 없음</div>';
-                return;
-            }
+  const ctx=document.getElementById("riskChart");
+  if(ctx) {
+    const c={RED:0,AMBER:0,GREEN:0};
+    rawData.forEach(d=>c[d.risk]++);
+    new Chart(ctx,{
+      type:"doughnut",
+      data:{labels:["Red","Amber","Green"],datasets:[{data:[c.RED,c.AMBER,c.GREEN],backgroundColor:["#ef4444","#f59e0b","#22c55e"],borderWidth:0}]},
+      options:{cutout:"70%",plugins:{legend:{position:"right"}}}
+    });
+  }
+}
 
-            filteredData.forEach(item => {
-                const el = document.createElement('a');
-                el.href = item.link;
-                el.target = '_blank';
-                el.className = 'block card p-5 no-underline group relative text-slate-800';
-                
-                const badge = 'badge-' + item.risk;
+updateDashboard();
+</script>
 
-                el.innerHTML = `
-                    <div class="flex justify-between items-start gap-4">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-2 flex-wrap">
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${badge}">${item.risk}</span>
-                                <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border">${item.keyword}</span>
-                                <span class="text-xs text-slate-400 font-mono">${item.date}</span>
-                            </div>
-                            <h4 class="font-bold text-base group-hover:text-blue-600 transition-colors leading-snug">
-                                ${item.title}
-                            </h4>
-                        </div>
-                        <i class="ph-bold ph-arrow-square-out text-slate-300 text-lg group-hover:text-blue-500"></i>
-                    </div>
-                `;
-                container.appendChild(el);
-            });
-        }
-
-        let myChart = null;
-        function renderChart() {
-            if (typeof Chart === 'undefined') return;
-            const counts = {'RED':0, 'AMBER':0, 'GREEN':0};
-            filteredData.forEach(d => {
-                if(counts[d.risk]!==undefined) counts[d.risk]++;
-                else counts['GREEN']++;
-            });
-
-            const ctx = document.getElementById('riskChart').getContext('2d');
-            if(myChart) myChart.destroy();
-            
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Red', 'Amber', 'Green'],
-                    datasets: [{
-                        data: [counts['RED'], counts['AMBER'], counts['GREEN']],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '75%',
-                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } } }
-                }
-            });
-        }
-
-        document.getElementById('filter-keyword').addEventListener('change', updateDashboard);
-        document.getElementById('filter-search').addEventListener('input', updateDashboard);
-    </script>
 </body>
 </html>
 """
 
-# --- [4] 파일 저장 (문자열 결합) ---
-# 여기가 핵심입니다: 템플릿 + 데이터 + 템플릿 뒷부분을 그냥 합쳐버립니다.
-final_html = html_head + json_payload + html_tail
+html = html.replace("__DATA__", json_payload).replace("__COUNT__", str(len(news_data)))
 
-with open(output_filename, 'w', encoding='utf-8') as f:
-    f.write(final_html)
+with open(output_filename, "w", encoding="utf-8") as f:
+    f.write(html)
 
-print(f"✨ '{output_filename}' 생성 완료!")
-print("이제 'ReferenceError'가 절대 발생할 수 없습니다.")
+output_filename
