@@ -3,90 +3,118 @@ from bs4 import BeautifulSoup
 import json
 import datetime
 import base64
+import os
 import random
 import time
 
 # ---------------------------------------------------------
-# [1] 설정 (구글 뉴스 검색 키워드)
+# [1] 설정 (감시할 키워드)
 # ---------------------------------------------------------
 KEYWORDS = ["KT텔레캅", "SK쉴더스", "에스원", "보안 사고", "해킹", "개인정보 유출", "산업 재해"]
 OUTPUT_FILENAME = "index.html"
 
 # ---------------------------------------------------------
-# [2] 위험도 분석 로직
+# [2] 위험도 분석 엔진
 # ---------------------------------------------------------
 def get_risk_level(title):
     t = title.lower()
-    # 붉은색(위험) 키워드
-    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌', '침해', '공격']): 
+    # 즉시 대응 필요 (RED)
+    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌', '침해', '도용']): 
         return 'RED'
-    # 주황색(주의) 키워드
-    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상', '중단']): 
+    # 주의 필요 (AMBER)
+    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상', '중단', '지연']): 
         return 'AMBER'
+    # 안전 (GREEN)
     return 'GREEN'
 
 # ---------------------------------------------------------
-# [3] 구글 뉴스 RSS 크롤러 (차단 없음, 100% 성공)
+# [3] 강력한 크롤러 (구글 RSS + 네이버 백업)
 # ---------------------------------------------------------
-def crawl_google_news():
-    print("🌍 구글 뉴스(RSS) 데이터 수집 시작...")
-    results = []
+def get_headers():
+    # 봇 차단을 피하기 위한 랜덤 헤더
+    agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    ]
+    return {"User-Agent": random.choice(agents)}
+
+def crawl_google(kw):
+    try:
+        url = f"https://news.google.com/rss/search?q={kw}&hl=ko&gl=KR&ceid=KR:ko"
+        res = requests.get(url, headers=get_headers(), timeout=5)
+        soup = BeautifulSoup(res.content, "xml")
+        items = soup.find_all("item")
+        
+        results = []
+        for item in items[:4]: # 키워드 당 4개
+            title = item.title.text
+            link = item.link.text
+            
+            # 날짜 처리
+            try:
+                pub_date = item.pubDate.text 
+                dt = datetime.datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z")
+                date_str = dt.strftime("%Y-%m-%d")
+            except:
+                date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+
+            results.append({
+                "keyword": kw, "title": title, "link": link, "date": date_str, "risk": get_risk_level(title)
+            })
+        return results
+    except Exception as e:
+        print(f"   ⚠️ 구글 크롤링 실패 ({kw}): {e}")
+        return []
+
+def crawl_naver(kw):
+    try:
+        url = f"https://search.naver.com/search.naver?where=news&query={kw}&sort=1"
+        res = requests.get(url, headers=get_headers(), timeout=5)
+        soup = BeautifulSoup(res.text, "html.parser")
+        items = soup.select("a.news_tit")
+        
+        results = []
+        for item in items[:4]:
+            title = item.get_text()
+            link = item['href']
+            if not link.startswith("http"): continue
+            
+            results.append({
+                "keyword": kw, "title": title, "link": link, 
+                "date": datetime.datetime.now().strftime("%Y-%m-%d"), 
+                "risk": get_risk_level(title)
+            })
+        return results
+    except Exception as e:
+        print(f"   ⚠️ 네이버 크롤링 실패 ({kw}): {e}")
+        return []
+
+# ---------------------------------------------------------
+# [4] 메인 실행 로직 (이중 크롤링)
+# ---------------------------------------------------------
+print("🕷️ 통합 크롤링 시작...")
+final_data = []
+
+for kw in KEYWORDS:
+    print(f"   🔎 검색: {kw}")
+    # 1차 시도: 구글 뉴스
+    data = crawl_google(kw)
     
-    for kw in KEYWORDS:
-        try:
-            # 구글 뉴스 RSS URL (한국 설정)
-            url = f"https://news.google.com/rss/search?q={kw}&hl=ko&gl=KR&ceid=KR:ko"
-            
-            # 요청 (RSS는 별도 헤더 없이도 잘 됩니다)
-            res = requests.get(url, timeout=5)
-            
-            # XML 파싱
-            soup = BeautifulSoup(res.content, "xml")
-            items = soup.find_all("item")
-            
-            print(f"   - [{kw}] 검색 결과: {len(items)}건 발견")
+    # 2차 시도: 구글 실패 시 네이버 시도
+    if not data:
+        print(f"      -> 구글 결과 없음, 네이버 전환...")
+        time.sleep(0.5)
+        data = crawl_naver(kw)
+    
+    final_data.extend(data)
+    time.sleep(random.uniform(0.3, 0.8)) # 차단 방지 딜레이
 
-            count = 0
-            for item in items:
-                if count >= 3: break # 키워드 당 최신 3개만
-                
-                title = item.title.text
-                link = item.link.text
-                pub_date = item.pubDate.text # 예: Tue, 19 Dec 2023...
-                
-                # 날짜 포맷을 간단하게 변환 (YYYY-MM-DD)
-                try:
-                    dt = datetime.datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z")
-                    date_str = dt.strftime("%Y-%m-%d")
-                except:
-                    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-
-                results.append({
-                    "keyword": kw,
-                    "title": title,
-                    "link": link,
-                    "date": date_str,
-                    "risk": get_risk_level(title)
-                })
-                count += 1
-                
-        except Exception as e:
-            print(f"   ⚠️ 에러 ({kw}): {e}")
-            pass
-            
-    return results
-
-# ---------------------------------------------------------
-# [4] 데이터 처리 및 Base64 암호화 (깨짐 방지)
-# ---------------------------------------------------------
-final_data = crawl_google_news()
-
-# 데이터가 하나도 없으면 샘플 데이터 생성
+# 그래도 데이터가 없으면 비상용 데이터 생성
 if not final_data:
-    print("🚑 데이터 수집 실패 -> 샘플 데이터 생성")
-    final_data = [{"keyword": "시스템", "title": "구글 뉴스 연결 실패 (샘플 데이터)", "link": "#", "date": "-", "risk": "GREEN"}]
+    print("🚑 모든 크롤링 실패 -> 비상용 데이터 생성")
+    final_data = [{"keyword": "시스템", "title": "현재 수집 가능한 뉴스가 없거나 접속이 차단되었습니다.", "link": "#", "date": datetime.datetime.now().strftime("%Y-%m-%d"), "risk": "RED"}]
 
-# JSON 변환 후 Base64 인코딩 (HTML 내 텍스트 깨짐 원천 차단)
+# ★ 핵심: Base64 암호화 (데이터 깨짐 방지)
 json_str = json.dumps(final_data, ensure_ascii=False)
 b64_data = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
 
@@ -96,7 +124,7 @@ b64_kw = base64.b64encode(kw_str.encode('utf-8')).decode('utf-8')
 print(f"✅ 총 {len(final_data)}건 처리 완료. 대시보드 생성 중...")
 
 # ---------------------------------------------------------
-# [5] HTML 생성 (전문가용 대시보드 템플릿)
+# [5] HTML 템플릿 (전문가용 디자인)
 # ---------------------------------------------------------
 html_template = """
 <!DOCTYPE html>
@@ -104,14 +132,14 @@ html_template = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Security Watch</title>
+    <title>Security Insight Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; color: #1e293b; }
-        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.2s; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.2s; }
         .glass-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
         #loader { position: fixed; inset: 0; background: white; z-index: 99; display: flex; flex-direction: column; justify-content: center; align-items: center; }
     </style>
@@ -120,15 +148,15 @@ html_template = """
 
     <div id="loader">
         <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p class="text-slate-500 font-bold">구글 뉴스 분석 중...</p>
+        <p class="text-slate-500 font-bold">보안 데이터 로딩 중...</p>
     </div>
 
     <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 px-6 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-2 font-bold text-lg">
-            <i class="ph-fill ph-globe-hemisphere-west text-blue-400"></i> Global Security Watch
+            <i class="ph-fill ph-shield-check text-blue-400"></i> Security Insight Pro
         </div>
         <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center gap-2">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Google News Live
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Dual-Engine Crawling
         </div>
     </nav>
 
@@ -158,7 +186,7 @@ html_template = """
                 <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</h3>
             </div>
             <div class="glass-card p-5 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold uppercase">Key Issue</p>
+                <p class="text-xs text-green-600 font-bold uppercase">Main Issue</p>
                 <h3 id="kpi-kw" class="text-lg font-bold text-green-700 mt-3 truncate">-</h3>
             </div>
         </div>
@@ -166,30 +194,27 @@ html_template = """
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="space-y-6">
                 <div class="glass-card p-5 sticky top-24">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4 pb-2 border-b">Dashboard Control</h3>
+                    <h3 class="font-bold text-sm text-slate-700 mb-4 pb-2 border-b">Control Panel</h3>
                     <div class="space-y-4">
                         <div>
-                            <label class="text-xs font-bold text-slate-500 block mb-1">Filter by Keyword</label>
-                            <select id="sel-kw" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 cursor-pointer"><option value="all">View All</option></select>
+                            <label class="text-xs font-bold text-slate-500 block mb-1">Keyword Filter</label>
+                            <select id="sel-kw" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 cursor-pointer"><option value="all">전체 보기</option></select>
                         </div>
                         <div>
                             <label class="text-xs font-bold text-slate-500 block mb-1">Search</label>
-                            <div class="relative">
-                                <i class="ph-bold ph-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
-                                <input id="inp-search" type="text" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="키워드 검색...">
-                            </div>
+                            <input id="inp-search" type="text" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="제목 검색...">
                         </div>
                     </div>
                 </div>
                 <div class="glass-card p-5">
-                    <h3 class="font-bold text-sm text-slate-700 mb-4">Risk Distribution</h3>
+                    <h3 class="font-bold text-sm text-slate-700 mb-4">Risk Share</h3>
                     <div class="h-48 relative"><canvas id="chart"></canvas></div>
                 </div>
             </div>
 
             <div class="lg:col-span-2">
                 <div class="flex justify-between items-end mb-4 px-1">
-                    <h3 class="font-bold text-lg text-slate-800">Latest Feed</h3>
+                    <h3 class="font-bold text-lg text-slate-800">News Feed</h3>
                     <span id="cnt" class="text-xs font-bold bg-white border px-2 py-1 rounded text-slate-500 shadow-sm">0 items</span>
                 </div>
                 <div id="list" class="space-y-3"></div>
@@ -197,16 +222,15 @@ html_template = """
         </div>
         
         <footer class="mt-12 py-8 text-center text-xs text-slate-400 border-t">
-            &copy; 2025 Global Security Watch. Powered by Google News RSS.
+            &copy; 2025 Security Insight Pro. Powered by Hybrid Crawler.
         </footer>
     </div>
 
     <script>
-        // ★ Base64 디코딩 (깨짐 방지 기술) ★
+        // ★★★ Base64 데이터 디코딩 (깨짐 방지) ★★★
         const B64_DATA = "__DATA_B64__";
         const B64_KW = "__KW_B64__";
         
-        // 유니코드 지원 디코더
         function decodeData(str) {
             try {
                 return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.codePointAt(0))));
@@ -320,7 +344,7 @@ html_template = """
             filtered.forEach(d => {
                 if(counts[d.risk]!==undefined) counts[d.risk]++;
                 else counts.GREEN++;
-            });
+            }});
 
             const ctx = document.getElementById('chart');
             myChart = new Chart(ctx, {
@@ -349,8 +373,7 @@ html_template = """
 </html>
 """
 
-# --- [6] 파일 저장 ---
-# Base64 데이터 주입
+# --- [6] 파일 저장 (데이터 주입) ---
 final_html = html_template.replace("__DATA_B64__", b64_data)
 final_html = final_html.replace("__KW_B64__", b64_kw)
 
@@ -358,4 +381,3 @@ with open(OUTPUT_FILENAME, 'w', encoding='utf-8') as f:
     f.write(final_html)
 
 print(f"✨ 생성 완료: {OUTPUT_FILENAME}")
-print("   (구글 뉴스 RSS + Base64 인코딩으로 문제를 완벽히 해결했습니다.)")
