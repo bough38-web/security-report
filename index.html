@@ -13,6 +13,7 @@ news_data = []
 try:
     with open(input_filename, mode='r', encoding='utf-8-sig') as csvfile:
         reader = csv.DictReader(csvfile)
+        # 컬럼명 정리
         if reader.fieldnames:
             reader.fieldnames = [h.strip() for h in reader.fieldnames]
 
@@ -20,14 +21,17 @@ try:
             title = row.get('title', '').strip()
             if not title: continue 
 
+            # 링크 처리
             link = row.get('link', '').strip()
             if link and not link.startswith('http') and link != "#":
                 link = 'https://' + link
             if not link: link = "#"
 
+            # 날짜 처리
             date = row.get('date_fmt', '').strip()
             if not date: date = row.get('date', '').strip()
             
+            # 리스크 처리
             risk = row.get('risk', 'GREEN').strip().upper()
             if risk not in ['RED', 'AMBER', 'GREEN']: risk = 'GREEN'
 
@@ -41,16 +45,15 @@ try:
     print(f"✅ 데이터 로드 완료: {len(news_data)}건")
 
 except FileNotFoundError:
-    print("❌ 오류: data.csv 파일이 없습니다.")
+    print("❌ 오류: data.csv 파일이 없습니다. 빈 화면이 생성됩니다.")
     news_data = []
 
-# --- [2] JSON 데이터 준비 ---
+# --- [2] JSON 데이터 변환 ---
+# 한글 깨짐 방지 및 특수문자 안전 처리
 json_payload = json.dumps(news_data, ensure_ascii=False)
 
 
-# --- [3] HTML 템플릿 (일반 문자열 사용 - f 안 붙임) ---
-# 이제 자바스크립트 문법(${item.title} 등)을 그대로 써도 에러가 나지 않습니다.
-
+# --- [3] HTML 생성 (Python f-string 사용 안 함 -> 충돌 원천 봉쇄) ---
 html_template = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -68,14 +71,31 @@ html_template = """
         .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
         .badge-AMBER { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
         .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        
+        /* 로딩 화면 & 에러 박스 */
         #loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #error-box { display: none; margin-top: 20px; padding: 20px; border: 2px solid #ef4444; background: #fef2f2; color: #b91c1c; border-radius: 8px; max-width: 80%; text-align: left; }
     </style>
+    
+    <script>
+        window.onerror = function(msg, url, line) {
+            const loader = document.getElementById('loader');
+            const errBox = document.getElementById('error-box');
+            if(loader) loader.style.display = 'flex'; // 로딩창 유지
+            if(errBox) {
+                errBox.style.display = 'block';
+                errBox.innerHTML = '<strong>⚠️ 시스템 에러 발생</strong><br>' + msg + '<br><small>Line: ' + line + '</small>';
+            }
+            return false;
+        };
+    </script>
 </head>
 <body>
 
     <div id="loader">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
         <p class="text-slate-500 font-bold">데이터 분석 중...</p>
+        <div id="error-box"></div>
     </div>
 
     <nav class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
@@ -94,7 +114,7 @@ html_template = """
                 <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
             </h2>
             <p class="text-slate-300 text-sm">
-                현재 <strong><span id="total-count-txt">0</span>건</strong>의 데이터가 로드되었습니다. 
+                현재 <strong><span id="total-txt">0</span>건</strong>의 데이터가 로드되었습니다. 
                 <span class="text-red-400 font-bold">RED 등급</span>(해킹/사고) 이슈는 즉시 확인 바랍니다.
             </p>
         </div>
@@ -153,22 +173,34 @@ html_template = """
 
     <script>
         // ★ 여기가 핵심: 데이터 치환 (Replace) ★
+        // __DATA_JSON__ 부분이 실제 데이터로 바뀝니다.
         const rawData = __DATA_JSON__;
         
         let filteredData = [...rawData];
 
-        window.onload = function() {
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('total-count-txt').textContent = rawData.length;
+        // 로드 완료 시 실행
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // 데이터 체크
+                if (!rawData || rawData.length === 0) {
+                    throw new Error("데이터가 0건입니다. CSV 파일을 확인해주세요.");
+                }
 
-            if (!rawData || rawData.length === 0) {
-                alert("데이터가 없습니다.");
-                return;
+                populateKeywords();
+                updateDashboard();
+                
+                // 성공 시 로딩 제거
+                document.getElementById('loader').style.display = 'none';
+
+            } catch (err) {
+                // 에러 발생 시 강제로 표시
+                const errBox = document.getElementById('error-box');
+                errBox.style.display = 'block';
+                errBox.innerHTML = '<strong>⚠️ 초기화 실패</strong><br>' + err.message;
             }
-            populateKeywords();
-            updateDashboard();
-        };
+        });
 
+        // 키워드 목록
         function populateKeywords() {
             const select = document.getElementById('filter-keyword');
             const keywords = [...new Set(rawData.map(d => d.keyword))].filter(k => k).sort();
@@ -180,6 +212,7 @@ html_template = """
             });
         }
 
+        // 화면 업데이트
         function updateDashboard() {
             const kVal = document.getElementById('filter-keyword').value;
             const sVal = document.getElementById('filter-search').value.toLowerCase();
@@ -195,7 +228,9 @@ html_template = """
             renderChart();
         }
 
+        // KPI 표시
         function renderKPIs() {
+            document.getElementById('total-txt').textContent = filteredData.length;
             document.getElementById('kpi-total').textContent = filteredData.length;
             document.getElementById('kpi-red').textContent = filteredData.filter(d => d.risk === 'RED').length;
             document.getElementById('kpi-amber').textContent = filteredData.filter(d => d.risk === 'AMBER').length;
@@ -211,6 +246,7 @@ html_template = """
             document.getElementById('list-count').textContent = filteredData.length + "건";
         }
 
+        // 리스트 표시 (템플릿 리터럴 사용 - JS 문법)
         function renderList() {
             const container = document.getElementById('news-list');
             container.innerHTML = '';
@@ -228,7 +264,7 @@ html_template = """
                 
                 const badge = 'badge-' + item.risk;
 
-                // ★ 자바스크립트 템플릿 리터럴 (이제 ${...} 써도 에러 안 남) ★
+                // ★ 자바스크립트 변수(${...})는 여기서 정상적으로 작동합니다.
                 el.innerHTML = `
                     <div class="flex justify-between items-start gap-4">
                         <div class="flex-1">
@@ -248,6 +284,7 @@ html_template = """
             });
         }
 
+        // 차트 표시
         let myChart = null;
         function renderChart() {
             if (typeof Chart === 'undefined') return;
@@ -280,7 +317,7 @@ html_template = """
             });
         }
 
-        // 리스너
+        // 이벤트 리스너
         document.getElementById('filter-keyword').addEventListener('change', updateDashboard);
         document.getElementById('filter-search').addEventListener('input', updateDashboard);
     </script>
@@ -288,12 +325,13 @@ html_template = """
 </html>
 """
 
-# --- [4] 데이터 삽입 및 파일 저장 ---
-# __DATA_JSON__ 부분을 실제 데이터로 교체합니다.
+# --- [4] 데이터 삽입 및 저장 ---
+# __DATA_JSON__ 부분을 실제 JSON 데이터로 교체
 final_html = html_template.replace('__DATA_JSON__', json_payload)
 
 with open(output_filename, 'w', encoding='utf-8') as f:
     f.write(final_html)
 
 print(f"✨ '{output_filename}' 생성 완료!")
-print("이제 자바스크립트 문법 충돌 없이 완벽하게 작동합니다.")
+print("1. 생성된 파일을 깃허브에 업로드하세요.")
+print("2. 만약 또 멈춘다면, 화면에 표시된 '빨간색 에러 메시지'를 알려주세요.")
