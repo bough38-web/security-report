@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Security Insight Pro - Timeline</title>
+    <title>Security Insight Pro - AI Summary</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -17,7 +17,6 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         
-        /* 대시보드 카드 스타일 */
         .dashboard-card {
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid #e2e8f0;
@@ -31,7 +30,7 @@
             border-color: #cbd5e1;
         }
 
-        /* 키워드 버튼 스타일 */
+        /* 그룹 라벨 및 버튼 */
         .group-label { font-size: 0.7rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
         .kw-btn {
             font-size: 0.8rem; padding: 6px 12px; border-radius: 8px; 
@@ -41,7 +40,7 @@
         .kw-btn:hover { background: #e2e8f0; color: #1e293b; }
         .kw-btn.active { background: #3b82f6; color: white; border-color: #2563eb; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
 
-        /* 날짜 라디오 버튼 스타일 */
+        /* 날짜 라디오 버튼 */
         .date-radio-group { display: flex; background: #f1f5f9; padding: 4px; border-radius: 10px; border: 1px solid #e2e8f0; }
         .date-radio-item { flex: 1; text-align: center; }
         .date-radio-item input { display: none; }
@@ -67,7 +66,7 @@
 
     <div id="loader">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-slate-600 font-bold animate-pulse">보안 데이터 분석 중...</p>
+        <p class="text-slate-600 font-bold animate-pulse">AI 인텔리전스 분석 중...</p>
     </div>
 
     <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 shadow-xl backdrop-blur-md bg-opacity-95 border-b border-slate-700">
@@ -78,7 +77,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg tracking-tight leading-none">Security Insight <span class="text-blue-400">Pro</span></h1>
-                    <p class="text-[10px] text-slate-400 font-medium tracking-wider mt-0.5">WEEKLY INTELLIGENCE</p>
+                    <p class="text-[10px] text-slate-400 font-medium tracking-wider mt-0.5">INTELLIGENCE DASHBOARD</p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
@@ -87,7 +86,7 @@
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
-                    System Live
+                    Live System
                 </div>
             </div>
         </div>
@@ -95,20 +94,20 @@
 
     <div class="max-w-7xl mx-auto p-6 space-y-6">
 
-        <div class="dashboard-card p-0 overflow-hidden border-none relative">
+        <div class="dashboard-card p-0 overflow-hidden border-none relative shadow-lg">
             <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white relative z-10">
                 <div class="flex flex-col md:flex-row gap-6 items-start">
                     <div class="shrink-0 p-3 bg-white/10 rounded-xl backdrop-blur-md border border-white/10">
                         <i class="ph-duotone ph-robot text-3xl text-blue-300"></i>
                     </div>
-                    <div class="flex-1">
-                        <h2 class="font-bold text-lg mb-2 flex items-center gap-2 text-blue-100">
-                            AI Executive Summary
-                            <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">BETA</span>
+                    <div class="flex-1 w-full">
+                        <h2 class="font-bold text-lg mb-3 flex items-center gap-2 text-blue-100 border-b border-white/10 pb-2">
+                            AI Executive Briefing
+                            <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">Analysis Ready</span>
                         </h2>
-                        <p id="ai-summary" class="text-slate-300 text-sm leading-relaxed font-light">
-                            데이터 분석 대기 중...
-                        </p>
+                        <div id="ai-summary-content" class="text-slate-300 text-sm leading-relaxed space-y-3">
+                            <p class="animate-pulse">데이터를 분석하고 있습니다...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -118,7 +117,7 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="dashboard-card p-5 border-l-4 border-blue-500">
                 <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">News Count</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Collected</span>
                     <i class="ph-duotone ph-newspaper text-2xl text-blue-500/50"></i>
                 </div>
                 <h3 id="kpi-total" class="text-3xl font-bold text-slate-800">-</h3>
@@ -139,7 +138,7 @@
             </div>
             <div class="dashboard-card p-5 border-l-4 border-green-500">
                 <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-bold text-green-600 uppercase tracking-wider">Top Issue</span>
+                    <span class="text-xs font-bold text-green-600 uppercase tracking-wider">Main Topic</span>
                     <i class="ph-duotone ph-trend-up text-2xl text-green-500/50"></i>
                 </div>
                 <h3 id="kpi-keyword" class="text-lg font-bold text-green-700 mt-2 truncate">-</h3>
@@ -159,7 +158,7 @@
                     </div>
 
                     <div class="mb-5">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">PERIOD</label>
+                        <label class="block text-xs font-bold text-slate-400 mb-2">TIMELINE</label>
                         <div class="date-radio-group">
                             <div class="date-radio-item">
                                 <input type="radio" id="d-1" name="date-range" value="1" onchange="setDateFilter('1')">
@@ -183,7 +182,7 @@
                     <div class="space-y-4" id="group-filter-container"></div>
 
                     <div class="mt-6 pt-4 border-t border-slate-100">
-                        <label class="block text-xs font-bold text-slate-400 mb-2">SEARCH</label>
+                        <label class="block text-xs font-bold text-slate-400 mb-2">DETAIL SEARCH</label>
                         <div class="relative">
                             <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
                             <input id="filter-search" type="text" placeholder="제목/키워드 검색..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none transition-all">
@@ -212,7 +211,7 @@
         </div>
 
         <footer class="text-center text-xs text-slate-400 py-8 border-t border-slate-200 mt-8">
-            &copy; 2025 Security Insight Pro.
+            &copy; 2025 Security Insight Pro. Powered by Automated Intelligence.
         </footer>
     </div>
 
@@ -227,12 +226,10 @@
         let rawData = [];
         let filteredData = [];
         let charts = {};
-        
-        // 상태 변수
         let currentKeywordFilter = "ALL";
-        let currentDateRange = "7"; // 기본 7일
+        let currentDateRange = "7";
 
-        // 1. 데이터 로드 (전체 로드 후 필터링)
+        // 1. 데이터 로드
         Papa.parse("data.csv", {
             download: true,
             header: true,
@@ -250,23 +247,21 @@
                             dateObj: new Date(dateStr)
                         };
                     })
-                    .filter(item => item.title && !isNaN(item.dateObj)); // 유효성 검사
+                    .filter(item => item.title && !isNaN(item.dateObj)); 
 
-                // 최신순 정렬
                 rawData.sort((a, b) => b.dateObj - a.dateObj);
-
                 document.getElementById("loader").style.display = "none";
                 
                 renderGroupButtons();
-                applyFilter(); // 초기 필터 적용
+                applyFilter();
             },
             error: function(err) {
                 document.getElementById("loader").style.display = "none";
-                document.getElementById("ai-summary").textContent = "데이터 로드 실패";
+                document.getElementById("ai-summary-content").innerHTML = "<span class='text-red-400'>데이터를 불러오지 못했습니다. CSV 파일을 확인해주세요.</span>";
             }
         });
 
-        // 2. 버튼 렌더링
+        // 2. 그룹 버튼 렌더링
         function renderGroupButtons() {
             const container = document.getElementById("group-filter-container");
             container.innerHTML = "";
@@ -306,14 +301,13 @@
                             btnWrap.appendChild(btn);
                         }
                     });
-
                     groupDiv.appendChild(btnWrap);
                     container.appendChild(groupDiv);
                 }
             });
         }
 
-        // 3. 필터 제어 함수
+        // 3. 필터 제어
         function setKeywordFilter(val, btnElement) {
             currentKeywordFilter = val;
             document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
@@ -323,47 +317,34 @@
 
         function setDateFilter(val) {
             currentDateRange = val;
-            
-            // 텍스트 업데이트
             const textMap = {"1": "오늘 (24h)", "3": "최근 3일", "7": "최근 7일", "ALL": "전체 기간"};
             document.getElementById("current-period-text").textContent = textMap[val];
-
             applyFilter();
         }
 
         function resetFilter() {
             currentKeywordFilter = "ALL";
-            currentDateRange = "7"; // 기본값 복귀
-            
+            currentDateRange = "7"; 
             document.getElementById("filter-search").value = "";
             document.querySelectorAll('.kw-btn').forEach(b => b.classList.remove('active'));
-            
-            // 라디오 버튼 UI 초기화
             document.querySelector('input[name="date-range"][value="7"]').checked = true;
             document.getElementById("current-period-text").textContent = "최근 7일";
-
             applyFilter();
         }
 
-        // 4. 통합 필터 로직
         function applyFilter() {
             const searchVal = document.getElementById("filter-search").value.toLowerCase();
             const today = new Date();
-            
-            // 날짜 기준 계산
             let dateCutoff = null;
             if (currentDateRange !== "ALL") {
                 dateCutoff = new Date();
                 dateCutoff.setDate(today.getDate() - parseInt(currentDateRange));
-                // 오늘(1일) 선택 시 시간까지 고려하지 않으려면 날짜만 비교하거나 자정 기준으로 설정
                 dateCutoff.setHours(0,0,0,0); 
             }
 
             filteredData = rawData.filter(item => {
-                // A. 날짜 필터
                 if (dateCutoff && item.dateObj < dateCutoff) return false;
-
-                // B. 키워드 필터
+                
                 let groupMatch = true;
                 if (currentKeywordFilter.startsWith("GROUP:")) {
                     const groupName = currentKeywordFilter.split(":")[1];
@@ -373,43 +354,83 @@
                     groupMatch = item.keyword.includes(currentKeywordFilter) || currentKeywordFilter.includes(item.keyword);
                 }
 
-                // C. 검색어 필터
                 const searchMatch = item.title.toLowerCase().includes(searchVal) || 
                                     item.keyword.toLowerCase().includes(searchVal);
-
                 return groupMatch && searchMatch;
             });
 
             renderDashboard();
         }
 
-        // 5. 렌더링
+        // 4. 대시보드 렌더링 & AI 요약
         function renderDashboard() {
             const data = filteredData;
             const total = data.length;
             const redCount = data.filter(d => d.risk === 'RED').length;
+            const amberCount = data.filter(d => d.risk === 'AMBER').length;
             
-            // AI Summary
-            let summaryText = "";
+            // --- [AI 스마트 요약 생성 로직] ---
+            const summaryContainer = document.getElementById("ai-summary-content");
+            let summaryHTML = "";
+
             if (total === 0) {
-                summaryText = "선택한 조건에 맞는 데이터가 없습니다.";
+                summaryHTML = `<p class="text-slate-400">🔍 선택된 조건에 맞는 데이터가 없습니다. 필터를 변경해보세요.</p>`;
             } else {
+                // 키워드 통계
                 const kwCounts = {};
                 data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
                 const topKw = Object.entries(kwCounts).sort((a,b)=>b[1]-a[1])[0][0];
+                
+                // 중요 기사 추출 (중복 제거)
+                const criticalItems = data.filter(d => d.risk === 'RED');
+                const uniqueCriticals = [];
+                const seenTitles = new Set();
+                criticalItems.forEach(d => {
+                    if(!seenTitles.has(d.title)) {
+                        seenTitles.add(d.title);
+                        uniqueCriticals.push(d);
+                    }
+                });
 
-                if (redCount > 0) {
-                    summaryText = `해당 기간 내 <span class="text-red-400 font-bold">심각(Critical) 이슈가 ${redCount}건</span> 있습니다. <strong>'${topKw}'</strong> 관련 내용을 우선 확인하세요.`;
+                // 1. 전체 상태 판단
+                let statusMsg = "";
+                let statusColor = "text-green-400";
+                if (redCount > 2) {
+                    statusMsg = "🚨 [심각] 현재 다수의 보안 위협이 탐지되었습니다.";
+                    statusColor = "text-red-400 font-bold";
+                } else if (redCount > 0 || amberCount > 5) {
+                    statusMsg = "⚠️ [주의] 일부 위협 요소가 있어 모니터링이 필요합니다.";
+                    statusColor = "text-amber-400 font-bold";
                 } else {
-                    summaryText = `총 ${total}건의 뉴스가 수집되었습니다. 주요 키워드는 <strong>'${topKw}'</strong>이며, 특이 사항은 없습니다.`;
+                    statusMsg = "✅ [안정] 특이사항 없이 안정적인 상태입니다.";
+                }
+
+                summaryHTML += `<p class="mb-3 ${statusColor}">${statusMsg}</p>`;
+                
+                // 2. 상세 브리핑
+                summaryHTML += `<p class="mb-3">선택 기간 동안 총 <strong>${total}건</strong>의 뉴스가 분석되었으며, <span class="text-blue-200">"${topKw}"</span> 키워드가 가장 많이 언급되었습니다.</p>`;
+
+                // 3. 주요 이슈 리스트 (RED가 있으면 보여줌)
+                if (uniqueCriticals.length > 0) {
+                    summaryHTML += `<div class="bg-white/5 rounded-lg p-3 border border-white/10 mt-2">
+                        <p class="text-xs text-red-300 font-bold mb-2 uppercase">🔴 주요 위협 브리핑</p>
+                        <ul class="space-y-1 text-sm text-slate-300 list-disc list-inside">`;
+                    
+                    // 최대 3개까지만 표시
+                    uniqueCriticals.slice(0, 3).forEach(item => {
+                        summaryHTML += `<li>${item.title.substring(0, 45)}${item.title.length>45?'...':''}</li>`;
+                    });
+                    
+                    summaryHTML += `</ul></div>`;
                 }
             }
-            document.getElementById("ai-summary").innerHTML = summaryText;
+            summaryContainer.innerHTML = summaryHTML;
+            // -------------------------------
 
             // KPIs
             document.getElementById("kpi-total").textContent = total.toLocaleString();
             document.getElementById("kpi-red").textContent = redCount;
-            document.getElementById("kpi-amber").textContent = data.filter(d => d.risk === "AMBER").length;
+            document.getElementById("kpi-amber").textContent = amberCount;
             
             const kwCounts = {};
             data.forEach(d => kwCounts[d.keyword] = (kwCounts[d.keyword]||0)+1);
