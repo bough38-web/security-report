@@ -2,35 +2,28 @@ import csv
 import json
 import os
 
-# --- [설정] 파일명 확인 ---
-input_filename = 'data.csv' 
+# --- [설정] 파일명 ---
+input_filename = 'data.csv'
 output_filename = 'index.html'
 
 # --- [1] CSV 데이터 읽기 ---
 news_data = []
-print(f"🔄 '{input_filename}' 데이터를 읽고 있습니다...")
+print(f"🔄 '{input_filename}' 데이터를 안전하게 변환 중...")
 
 try:
-    # utf-8-sig: 엑셀 CSV 한글 깨짐 방지
     with open(input_filename, mode='r', encoding='utf-8-sig') as csvfile:
         reader = csv.DictReader(csvfile)
-        
-        # 컬럼명 공백 제거
         if reader.fieldnames:
             reader.fieldnames = [h.strip() for h in reader.fieldnames]
 
         for row in reader:
             title = row.get('title', '').strip()
-            # 제목이 없는 데이터는 제외
-            if not title: 
-                continue
+            if not title: continue # 제목 없으면 건너뜀
 
             link = row.get('link', '').strip()
-            # 링크 보정: http가 없으면 붙여줌
-            if link and not link.startswith('http') and link != "#":
-                link = 'https://' + link
-            if not link:
-                link = "#"
+            # 링크 보정
+            if not link: link = "#"
+            elif not link.startswith('http') and link != "#": link = 'https://' + link
 
             # 날짜 보정
             date = row.get('date_fmt', '').strip()
@@ -47,19 +40,18 @@ try:
                 "risk": risk
             })
 
-    print(f"✅ 데이터 로드 성공: {len(news_data)}건")
+    print(f"✅ 데이터 {len(news_data)}건 로드 완료.")
 
 except FileNotFoundError:
-    print("❌ 오류: data.csv 파일을 찾을 수 없습니다.")
+    print("❌ 오류: data.csv가 없습니다. 빈 대시보드를 생성합니다.")
     news_data = []
 
-# 데이터를 JSON 문자열로 변환 (HTML에 주입할 준비)
-json_payload = json.dumps(news_data, ensure_ascii=False)
+# --- [핵심] JSON 변환 (특수문자 에러 방지용) ---
+# 자바스크립트 코드 내에서 깨지지 않도록 이스케이프 처리
+json_payload = json.dumps(news_data, ensure_ascii=False).replace('<', '\\u003c').replace('>', '\\u003e')
 
 
-# --- [2] HTML 템플릿 (충돌 방지를 위해 일반 문자열로 작성) ---
-# __DATA_PLACEHOLDER__ 부분을 나중에 데이터로 교체합니다.
-
+# --- [2] HTML 템플릿 (안전장치 포함) ---
 html_template = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -71,22 +63,24 @@ html_template = """
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
         .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
         .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
         .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
         .badge-AMBER { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
         .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
-        /* 로딩 화면 스타일 */
-        #loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        
+        /* 로딩 화면 */
+        #loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #error-msg { display: none; margin-top: 20px; color: red; font-weight: bold; padding: 20px; border: 1px solid red; background: #fff5f5; border-radius: 8px; max-width: 80%; }
     </style>
 </head>
-<body class="text-slate-800">
+<body>
 
     <div id="loader">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-slate-500 font-bold">데이터 분석 중...</p>
-    </div>
+        <p class="text-slate-500 font-bold text-lg">데이터 분석 중...</p>
+        <div id="error-msg"></div> </div>
 
     <nav class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
         <div class="container mx-auto px-4 h-14 flex items-center justify-between">
@@ -94,7 +88,7 @@ html_template = """
                 <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
                 <span class="font-bold text-lg">Security Insight</span>
             </div>
-            <span class="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-700">Live Dashboard</span>
+            <span class="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-700">Safe Mode</span>
         </div>
     </nav>
 
@@ -102,12 +96,11 @@ html_template = """
         
         <div class="card p-6 mb-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
             <h2 class="font-bold text-lg mb-2 flex items-center gap-2">
-                <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
+                <i class="ph-duotone ph-robot text-blue-400"></i> 시스템 현황
             </h2>
             <p class="text-slate-300 text-sm">
-                현재 <strong id="total-articles" class="text-white">0</strong>건의 데이터가 로드되었습니다. 
-                <span class="text-red-400 font-bold">RED 등급</span>(해킹/사고) 이슈는 즉시 확인 바랍니다.
-                아래 리스트를 클릭하면 <strong>기사 원문</strong>으로 이동합니다.
+                총 <strong id="total-txt" class="text-white">0</strong>건의 보안 뉴스가 로드되었습니다. 
+                <span class="text-red-400 font-bold">RED 등급</span> 이슈를 우선적으로 확인하십시오.
             </p>
         </div>
 
@@ -125,30 +118,26 @@ html_template = """
                 <p class="text-2xl font-bold text-amber-600" id="kpi-amber">-</p>
             </div>
             <div class="card p-4 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold">Keyword</p>
+                <p class="text-xs text-green-600 font-bold">Top Keyword</p>
                 <p class="text-lg font-bold text-green-700 truncate" id="kpi-keyword">-</p>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
             <div class="space-y-6">
                 <div class="card p-5 sticky top-20">
                     <h3 class="font-bold text-sm mb-4 border-b pb-2">필터링</h3>
                     <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">키워드</label>
-                            <select id="filter-keyword" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none focus:border-blue-500">
-                                <option value="all">전체</option>
-                            </select>
+                            <select id="filter-keyword" class="w-full border p-2 rounded text-sm bg-slate-50"><option value="all">전체</option></select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">검색</label>
-                            <input id="filter-search" type="text" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none focus:border-blue-500" placeholder="제목 검색...">
+                            <input id="filter-search" type="text" class="w-full border p-2 rounded text-sm bg-slate-50" placeholder="제목 검색...">
                         </div>
                     </div>
                 </div>
-
                 <div class="card p-5">
                     <h3 class="font-bold text-xs mb-4 text-slate-500 uppercase">Risk Share</h3>
                     <div class="h-48 relative"><canvas id="riskChart"></canvas></div>
@@ -160,35 +149,65 @@ html_template = """
                     <h3 class="font-bold text-lg">뉴스 피드</h3>
                     <span id="list-count" class="text-xs font-bold bg-white border px-2 py-1 rounded">0건</span>
                 </div>
-                <div id="news-list" class="space-y-3">
-                    </div>
+                <div id="news-list" class="space-y-3"></div>
             </div>
         </div>
-
-        <footer class="mt-12 text-center text-xs text-slate-400 py-8 border-t">
-            Powered by GitHub Pages
-        </footer>
+        
+        <footer class="mt-12 text-center text-xs text-slate-400 py-8 border-t">Powered by GitHub Pages</footer>
     </div>
 
     <script>
-        // ★ 핵심: 파이썬에서 만든 데이터를 여기에 주입합니다.
+        // 에러 발생 시 사용자에게 알림
+        window.onerror = function(msg, url, line) {
+            const errDiv = document.getElementById('error-msg');
+            errDiv.style.display = 'block';
+            errDiv.innerHTML = `⚠️ 시스템 에러 발생:<br>${msg}<br><small>Line: ${line}</small>`;
+            return false;
+        };
+
+        // 데이터 주입 (Python이 이 부분을 실제 데이터로 교체함)
         const rawData = __DATA_PLACEHOLDER__;
         let filteredData = [...rawData];
 
-        // 초기화
-        window.onload = function() {
-            // 로딩 화면 제거
-            document.getElementById('loader').style.display = 'none';
-            
-            console.log("Data Loaded:", rawData.length);
-            if(rawData.length === 0) {
-                alert("데이터가 없습니다. CSV 파일을 확인해주세요.");
+        // 메인 실행 함수 (안전장치 포함)
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                console.log("시스템 시작: 데이터 " + rawData.length + "건");
+                
+                // 1. 데이터가 없으면 경고
+                if (!rawData || rawData.length === 0) {
+                    throw new Error("데이터가 0건입니다. CSV 파일을 확인해주세요.");
+                }
+
+                // 2. 초기화 실행
+                populateKeywords();
+                updateDashboard();
+
+                // 3. 성공 시 로딩 제거
+                setTimeout(() => {
+                    const loader = document.getElementById('loader');
+                    if(loader) loader.style.display = 'none';
+                }, 500); // 0.5초 뒤 자연스럽게 제거
+
+            } catch (err) {
+                console.error("초기화 실패:", err);
+                const errDiv = document.getElementById('error-msg');
+                errDiv.style.display = 'block';
+                errDiv.innerHTML = `⚠️ 초기화 실패: ${err.message}`;
             }
+        });
 
-            populateKeywords();
-            updateDashboard();
-        };
+        // 4. [안전장치] 로딩이 3초 이상 지속되면 강제 종료
+        setTimeout(() => {
+            const loader = document.getElementById('loader');
+            if (loader && loader.style.display !== 'none') {
+                console.warn("로딩 시간 초과 -> 강제 화면 표시");
+                loader.style.display = 'none';
+            }
+        }, 3000);
 
+
+        // --- 기능 구현 ---
         function populateKeywords() {
             const select = document.getElementById('filter-keyword');
             const keywords = [...new Set(rawData.map(d => d.keyword))].filter(k => k).sort();
@@ -216,7 +235,7 @@ html_template = """
         }
 
         function renderKPIs() {
-            document.getElementById('total-articles').textContent = filteredData.length;
+            document.getElementById('total-txt').textContent = filteredData.length;
             document.getElementById('kpi-total').textContent = filteredData.length;
             document.getElementById('kpi-red').textContent = filteredData.filter(d => d.risk === 'RED').length;
             document.getElementById('kpi-amber').textContent = filteredData.filter(d => d.risk === 'AMBER').length;
@@ -237,16 +256,15 @@ html_template = """
             container.innerHTML = '';
 
             if(filteredData.length === 0) {
-                container.innerHTML = '<div class="p-8 text-center border border-dashed rounded text-slate-400">검색 결과가 없습니다.</div>';
+                container.innerHTML = '<div class="p-10 text-center border rounded text-slate-400">데이터 없음</div>';
                 return;
             }
 
             filteredData.forEach(item => {
-                // 링크 카드 생성
                 const el = document.createElement('a');
                 el.href = item.link;
-                el.target = '_blank'; // 새 탭 열기
-                el.className = 'block card p-5 no-underline group relative';
+                el.target = '_blank';
+                el.className = 'block card p-5 no-underline group relative text-slate-800';
                 
                 const badge = 'badge-' + item.risk;
 
@@ -258,12 +276,9 @@ html_template = """
                                 <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border">${item.keyword}</span>
                                 <span class="text-xs text-slate-400 font-mono">${item.date}</span>
                             </div>
-                            <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-blue-600 transition-colors">
+                            <h4 class="font-bold text-base group-hover:text-blue-600 transition-colors leading-snug">
                                 ${item.title}
                             </h4>
-                            <div class="mt-2 text-xs text-slate-400 truncate flex items-center gap-1 opacity-60 group-hover:opacity-100">
-                                <i class="ph-bold ph-link"></i> ${item.link}
-                            </div>
                         </div>
                         <i class="ph-bold ph-arrow-square-out text-slate-300 text-lg group-hover:text-blue-500"></i>
                     </div>
@@ -274,6 +289,12 @@ html_template = """
 
         let myChart = null;
         function renderChart() {
+            // Chart.js가 로드되지 않았을 경우 대비
+            if (typeof Chart === 'undefined') {
+                console.error("Chart.js 라이브러리 로드 실패");
+                return; 
+            }
+
             const counts = {'RED':0, 'AMBER':0, 'GREEN':0};
             filteredData.forEach(d => {
                 if(counts[d.risk]!==undefined) counts[d.risk]++;
@@ -310,12 +331,13 @@ html_template = """
 </html>
 """
 
-# --- [3] 최종 파일 생성 ---
-# 데이터를 템플릿에 안전하게 삽입
+# --- [3] 최종 파일 저장 ---
 final_html = html_template.replace('__DATA_PLACEHOLDER__', json_payload)
 
 with open(output_filename, 'w', encoding='utf-8') as f:
     f.write(final_html)
 
-print(f"\n✨ 생성 완료! '{output_filename}' 파일을 업로드하세요.")
-print("HTML 파일 안에 데이터가 포함되어 있어, 별도의 CSV 파일이 없어도 작동합니다.")
+print(f"\n✨ 안전장치가 적용된 '{output_filename}' 파일 생성 완료!")
+print("1. 이 파일을 깃허브에 업로드하세요.")
+print("2. 3초가 지나면 로딩 화면이 강제로 사라지며 대시보드가 나타납니다.")
+print("3. 만약 빨간색 에러 메시지가 뜬다면 내용을 알려주세요.")
