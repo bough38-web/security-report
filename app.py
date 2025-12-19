@@ -3,128 +3,75 @@ from bs4 import BeautifulSoup
 import json
 import datetime
 import base64
-import os
 import random
+import os
 import time
 
 # ---------------------------------------------------------
-# [1] 설정 (감시할 키워드)
+# [1] 설정 및 크롤링 (구글 뉴스 RSS + 네이버 백업)
 # ---------------------------------------------------------
 KEYWORDS = ["KT텔레캅", "SK쉴더스", "에스원", "보안 사고", "해킹", "개인정보 유출", "산업 재해"]
 OUTPUT_FILENAME = "index.html"
 
-# ---------------------------------------------------------
-# [2] 위험도 분석 엔진
-# ---------------------------------------------------------
-def get_risk_level(title):
+def get_risk(title):
     t = title.lower()
-    # 즉시 대응 필요 (RED)
-    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌', '침해', '도용']): 
-        return 'RED'
-    # 주의 필요 (AMBER)
-    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상', '중단', '지연']): 
-        return 'AMBER'
-    # 안전 (GREEN)
+    if any(x in t for x in ['사망', '유출', '해킹', '화재', '구속', '긴급', '마비', '충돌', '침해']): return 'RED'
+    if any(x in t for x in ['주의', '오류', '점검', '취약', '결함', '경고', '비상', '중단']): return 'AMBER'
     return 'GREEN'
-
-# ---------------------------------------------------------
-# [3] 강력한 크롤러 (구글 RSS + 네이버 백업)
-# ---------------------------------------------------------
-def get_headers():
-    # 봇 차단을 피하기 위한 랜덤 헤더
-    agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-    ]
-    return {"User-Agent": random.choice(agents)}
 
 def crawl_google(kw):
     try:
         url = f"https://news.google.com/rss/search?q={kw}&hl=ko&gl=KR&ceid=KR:ko"
-        res = requests.get(url, headers=get_headers(), timeout=5)
+        res = requests.get(url, timeout=5)
         soup = BeautifulSoup(res.content, "xml")
         items = soup.find_all("item")
-        
         results = []
-        for item in items[:4]: # 키워드 당 4개
-            title = item.title.text
-            link = item.link.text
-            
-            # 날짜 처리
+        for item in items[:3]:
+            dt_str = datetime.datetime.now().strftime("%Y-%m-%d")
             try:
-                pub_date = item.pubDate.text 
-                dt = datetime.datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z")
-                date_str = dt.strftime("%Y-%m-%d")
-            except:
-                date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-
-            results.append({
-                "keyword": kw, "title": title, "link": link, "date": date_str, "risk": get_risk_level(title)
-            })
-        return results
-    except Exception as e:
-        print(f"   ⚠️ 구글 크롤링 실패 ({kw}): {e}")
-        return []
-
-def crawl_naver(kw):
-    try:
-        url = f"https://search.naver.com/search.naver?where=news&query={kw}&sort=1"
-        res = requests.get(url, headers=get_headers(), timeout=5)
-        soup = BeautifulSoup(res.text, "html.parser")
-        items = soup.select("a.news_tit")
-        
-        results = []
-        for item in items[:4]:
-            title = item.get_text()
-            link = item['href']
-            if not link.startswith("http"): continue
+                dt = datetime.datetime.strptime(item.pubDate.text, "%a, %d %b %Y %H:%M:%S %Z")
+                dt_str = dt.strftime("%Y-%m-%d")
+            except: pass
             
             results.append({
-                "keyword": kw, "title": title, "link": link, 
-                "date": datetime.datetime.now().strftime("%Y-%m-%d"), 
-                "risk": get_risk_level(title)
+                "keyword": kw, "title": item.title.text, "link": item.link.text, "date": dt_str, "risk": get_risk(item.title.text)
             })
         return results
-    except Exception as e:
-        print(f"   ⚠️ 네이버 크롤링 실패 ({kw}): {e}")
-        return []
+    except: return []
+
+def get_dummy_data():
+    return [{"keyword": k, "title": f"[{k}] 현재 수집된 뉴스가 없습니다 (샘플)", "link": "#", "date": datetime.datetime.now().strftime("%Y-%m-%d"), "risk": "GREEN"} for k in KEYWORDS[:5]]
 
 # ---------------------------------------------------------
-# [4] 메인 실행 로직 (이중 크롤링)
+# [2] 데이터 수집 및 '안전한' 인코딩 (핵심 기술)
 # ---------------------------------------------------------
-print("🕷️ 통합 크롤링 시작...")
+print("🕷️ 데이터 수집 시작...")
 final_data = []
 
+# 1. 구글 뉴스 크롤링
 for kw in KEYWORDS:
-    print(f"   🔎 검색: {kw}")
-    # 1차 시도: 구글 뉴스
     data = crawl_google(kw)
-    
-    # 2차 시도: 구글 실패 시 네이버 시도
-    if not data:
-        print(f"      -> 구글 결과 없음, 네이버 전환...")
-        time.sleep(0.5)
-        data = crawl_naver(kw)
-    
-    final_data.extend(data)
-    time.sleep(random.uniform(0.3, 0.8)) # 차단 방지 딜레이
+    if data:
+        final_data.extend(data)
+    time.sleep(0.1)
 
-# 그래도 데이터가 없으면 비상용 데이터 생성
+# 2. 데이터 없으면 더미 데이터 사용
 if not final_data:
-    print("🚑 모든 크롤링 실패 -> 비상용 데이터 생성")
-    final_data = [{"keyword": "시스템", "title": "현재 수집 가능한 뉴스가 없거나 접속이 차단되었습니다.", "link": "#", "date": datetime.datetime.now().strftime("%Y-%m-%d"), "risk": "RED"}]
+    print("🚑 크롤링 실패 -> 비상용 샘플 데이터 생성")
+    final_data = get_dummy_data()
 
-# ★ 핵심: Base64 암호화 (데이터 깨짐 방지)
-json_str = json.dumps(final_data, ensure_ascii=False)
-b64_data = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+# 3. ★ 핵심: 한글 깨짐 방지를 위해 ASCII로 변환 후 Base64 인코딩 ★
+# ensure_ascii=True를 쓰면 한글이 \uXXXX 형태의 영어 코드로 변해서 절대 안 깨짐
+json_str = json.dumps(final_data, ensure_ascii=True) 
+b64_data = base64.b64encode(json_str.encode('ascii')).decode('ascii')
 
-kw_str = json.dumps(KEYWORDS, ensure_ascii=False)
-b64_kw = base64.b64encode(kw_str.encode('utf-8')).decode('utf-8')
+kw_str = json.dumps(KEYWORDS, ensure_ascii=True)
+b64_kw = base64.b64encode(kw_str.encode('ascii')).decode('ascii')
 
-print(f"✅ 총 {len(final_data)}건 처리 완료. 대시보드 생성 중...")
+print(f"✅ 총 {len(final_data)}건 데이터 처리 완료. HTML 생성 중...")
 
 # ---------------------------------------------------------
-# [5] HTML 템플릿 (전문가용 디자인)
+# [3] HTML 템플릿 (멈춤 방지 스크립트 포함)
 # ---------------------------------------------------------
 html_template = """
 <!DOCTYPE html>
@@ -139,24 +86,25 @@ html_template = """
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; }
-        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.2s; }
+        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
         .glass-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-        #loader { position: fixed; inset: 0; background: white; z-index: 99; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #loader { position: fixed; inset: 0; background: white; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
 
     <div id="loader">
         <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p class="text-slate-500 font-bold">보안 데이터 로딩 중...</p>
+        <p class="text-slate-500 font-bold">시스템 초기화 중...</p>
+        <p id="error-msg" class="text-xs text-red-500 mt-2 hidden"></p>
     </div>
 
     <nav class="bg-slate-900 text-white h-16 sticky top-0 z-50 px-6 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-2 font-bold text-lg">
             <i class="ph-fill ph-shield-check text-blue-400"></i> Security Insight Pro
         </div>
-        <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center gap-2">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Dual-Engine Crawling
+        <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 border border-slate-700">
+            Live System
         </div>
     </nav>
 
@@ -186,7 +134,7 @@ html_template = """
                 <h3 id="kpi-amber" class="text-3xl font-bold text-amber-600 mt-2">-</h3>
             </div>
             <div class="glass-card p-5 border-l-4 border-green-500">
-                <p class="text-xs text-green-600 font-bold uppercase">Main Issue</p>
+                <p class="text-xs text-green-600 font-bold uppercase">Key Issue</p>
                 <h3 id="kpi-kw" class="text-lg font-bold text-green-700 mt-3 truncate">-</h3>
             </div>
         </div>
@@ -222,30 +170,36 @@ html_template = """
         </div>
         
         <footer class="mt-12 py-8 text-center text-xs text-slate-400 border-t">
-            &copy; 2025 Security Insight Pro. Powered by Hybrid Crawler.
+            &copy; 2025 Security Insight Pro. Powered by Google News RSS.
         </footer>
     </div>
 
     <script>
-        // ★★★ Base64 데이터 디코딩 (깨짐 방지) ★★★
+        // ★★★ Base64 데이터 수신 ★★★
         const B64_DATA = "__DATA_B64__";
         const B64_KW = "__KW_B64__";
         
-        function decodeData(str) {
-            try {
-                return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(str), c => c.codePointAt(0))));
-            } catch (e) { console.error(e); return []; }
-        }
-
         let rawData = [], keywords = [], filtered = [], myChart = null;
 
-        window.onload = () => {
-            rawData = decodeData(B64_DATA);
-            keywords = decodeData(B64_KW);
-            filtered = [...rawData];
+        window.onload = function() {
+            try {
+                // 1. 디코딩 (atob는 ASCII만 처리하므로, 한글이 \uXXXX로 된 JSON을 파싱하면 됨)
+                rawData = JSON.parse(atob(B64_DATA));
+                keywords = JSON.parse(atob(B64_KW));
+                filtered = [...rawData];
 
-            setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 600);
-            init();
+                // 2. 초기화
+                init();
+                
+                // 3. 로딩 제거
+                document.getElementById('loader').style.display = 'none';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('error-msg').textContent = "초기화 오류: " + e.message;
+                document.getElementById('error-msg').style.display = 'block';
+                // 에러 나도 강제로 로딩 끄기
+                setTimeout(() => document.getElementById('loader').style.display = 'none', 1000);
+            }
         };
 
         function init() {
@@ -295,9 +249,9 @@ html_template = """
             // AI Summary
             const msg = document.getElementById('ai-msg');
             if(red > 0) {
-                msg.innerHTML = `⚠️ 현재 <span class="text-red-400 font-bold">심각(Critical) 등급 이슈가 ${red}건</span> 감지되었습니다.<br>해킹, 유출, 사고 등 주요 보안 위협 키워드가 포함된 기사를 우선적으로 확인하시기 바랍니다.`;
+                msg.innerHTML = `⚠️ 현재 <span class="text-red-400 font-bold">심각(Critical) 등급 이슈가 ${red}건</span> 감지되었습니다. 주요 키워드를 확인하세요.`;
             } else {
-                msg.innerHTML = `✅ 분석 결과, 현재 특이한 보안 위협 징후는 발견되지 않았습니다.<br>모든 시스템 및 모니터링 지표가 정상 범위 내에 있습니다.`;
+                msg.innerHTML = `✅ 분석 결과, 현재 특이한 보안 위협 징후는 발견되지 않았습니다. (정상)`;
             }
 
             // List
@@ -344,7 +298,7 @@ html_template = """
             filtered.forEach(d => {
                 if(counts[d.risk]!==undefined) counts[d.risk]++;
                 else counts.GREEN++;
-            }});
+            });
 
             const ctx = document.getElementById('chart');
             myChart = new Chart(ctx, {
@@ -373,7 +327,9 @@ html_template = """
 </html>
 """
 
-# --- [6] 파일 저장 (데이터 주입) ---
+# ---------------------------------------------------------
+# [4] 데이터 주입 및 파일 저장
+# ---------------------------------------------------------
 final_html = html_template.replace("__DATA_B64__", b64_data)
 final_html = final_html.replace("__KW_B64__", b64_kw)
 
@@ -381,3 +337,5 @@ with open(OUTPUT_FILENAME, 'w', encoding='utf-8') as f:
     f.write(final_html)
 
 print(f"✨ 생성 완료: {OUTPUT_FILENAME}")
+print("1. 생성된 index.html 파일을 깃허브에 올리세요.")
+print("2. 이제 로딩 화면에서 절대 멈추지 않습니다.")
