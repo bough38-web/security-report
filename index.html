@@ -6,29 +6,34 @@ import os
 input_filename = 'data.csv'
 output_filename = 'index.html'
 
-# --- [1] CSV 데이터 읽기 ---
+# --- [1] 데이터 읽기 ---
+print(f"🔄 '{input_filename}' 데이터를 읽고 있습니다...")
 news_data = []
-print(f"🔄 '{input_filename}' 데이터를 안전하게 변환 중...")
 
 try:
+    # 엑셀 CSV 호환성(utf-8-sig)
     with open(input_filename, mode='r', encoding='utf-8-sig') as csvfile:
         reader = csv.DictReader(csvfile)
+        
+        # 컬럼명 공백 제거
         if reader.fieldnames:
             reader.fieldnames = [h.strip() for h in reader.fieldnames]
 
         for row in reader:
             title = row.get('title', '').strip()
-            if not title: continue # 제목 없으면 건너뜀
+            if not title: continue 
 
+            # 링크 처리 (http 없으면 붙이기)
             link = row.get('link', '').strip()
-            # 링크 보정
+            if link and not link.startswith('http') and link != "#":
+                link = 'https://' + link
             if not link: link = "#"
-            elif not link.startswith('http') and link != "#": link = 'https://' + link
 
-            # 날짜 보정
+            # 날짜 처리
             date = row.get('date_fmt', '').strip()
             if not date: date = row.get('date', '').strip()
-
+            
+            # 리스크 처리
             risk = row.get('risk', 'GREEN').strip().upper()
             if risk not in ['RED', 'AMBER', 'GREEN']: risk = 'GREEN'
 
@@ -40,47 +45,46 @@ try:
                 "risk": risk
             })
 
-    print(f"✅ 데이터 {len(news_data)}건 로드 완료.")
+    print(f"✅ 데이터 로드 완료: {len(news_data)}건")
 
 except FileNotFoundError:
-    print("❌ 오류: data.csv가 없습니다. 빈 대시보드를 생성합니다.")
+    print("❌ 오류: data.csv 파일이 없습니다. (빈 데이터로 진행)")
     news_data = []
 
-# --- [핵심] JSON 변환 (특수문자 에러 방지용) ---
-# 자바스크립트 코드 내에서 깨지지 않도록 이스케이프 처리
-json_payload = json.dumps(news_data, ensure_ascii=False).replace('<', '\\u003c').replace('>', '\\u003e')
+# --- [2] JSON 데이터 변환 (자바스크립트용) ---
+# 이 부분이 핵심입니다. 데이터를 미리 문자열로 만들어둡니다.
+json_payload = json.dumps(news_data, ensure_ascii=False)
 
 
-# --- [2] HTML 템플릿 (안전장치 포함) ---
-html_template = """
+# --- [3] HTML 생성 (f-string으로 데이터 직접 삽입) ---
+# __DATA_PLACEHOLDER__ 같은 임시 단어를 쓰지 않고, {json_payload}를 바로 집어넣습니다.
+
+html_content = f"""
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Dashboard</title>
+    <title>Security Insight Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
-        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-        .badge-RED { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-        .badge-AMBER { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
-        .badge-GREEN { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
-        
-        /* 로딩 화면 */
-        #loader { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #error-msg { display: none; margin-top: 20px; color: red; font-weight: bold; padding: 20px; border: 1px solid red; background: #fff5f5; border-radius: 8px; max-width: 80%; }
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }}
+        .card {{ background: white; border: 1px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; }}
+        .card:hover {{ transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }}
+        .badge-RED {{ background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }}
+        .badge-AMBER {{ background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }}
+        .badge-GREEN {{ background: #dcfce7; color: #166534; border: 1px solid #86efac; }}
+        #loader {{ position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }}
     </style>
 </head>
 <body>
 
     <div id="loader">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-slate-500 font-bold text-lg">데이터 분석 중...</p>
-        <div id="error-msg"></div> </div>
+        <p class="text-slate-500 font-bold">데이터 분석 중...</p>
+    </div>
 
     <nav class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
         <div class="container mx-auto px-4 h-14 flex items-center justify-between">
@@ -88,19 +92,19 @@ html_template = """
                 <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
                 <span class="font-bold text-lg">Security Insight</span>
             </div>
-            <span class="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-700">Safe Mode</span>
+            <span class="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-700">Live Dashboard</span>
         </div>
     </nav>
 
     <div class="container mx-auto px-4 py-6 max-w-7xl">
-        
         <div class="card p-6 mb-6 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
             <h2 class="font-bold text-lg mb-2 flex items-center gap-2">
-                <i class="ph-duotone ph-robot text-blue-400"></i> 시스템 현황
+                <i class="ph-duotone ph-robot text-blue-400"></i> AI 인사이트
             </h2>
             <p class="text-slate-300 text-sm">
-                총 <strong id="total-txt" class="text-white">0</strong>건의 보안 뉴스가 로드되었습니다. 
-                <span class="text-red-400 font-bold">RED 등급</span> 이슈를 우선적으로 확인하십시오.
+                현재 <strong>{len(news_data)}건</strong>의 데이터가 로드되었습니다. 
+                <span class="text-red-400 font-bold">RED 등급</span>(해킹/사고) 이슈는 즉시 확인 바랍니다.
+                아래 리스트를 클릭하면 <strong>기사 원문</strong>으로 이동합니다.
             </p>
         </div>
 
@@ -130,11 +134,11 @@ html_template = """
                     <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">키워드</label>
-                            <select id="filter-keyword" class="w-full border p-2 rounded text-sm bg-slate-50"><option value="all">전체</option></select>
+                            <select id="filter-keyword" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none"><option value="all">전체</option></select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">검색</label>
-                            <input id="filter-search" type="text" class="w-full border p-2 rounded text-sm bg-slate-50" placeholder="제목 검색...">
+                            <input id="filter-search" type="text" class="w-full border p-2 rounded text-sm bg-slate-50 outline-none" placeholder="제목 검색...">
                         </div>
                     </div>
                 </div>
@@ -157,110 +161,83 @@ html_template = """
     </div>
 
     <script>
-        // 에러 발생 시 사용자에게 알림
-        window.onerror = function(msg, url, line) {
-            const errDiv = document.getElementById('error-msg');
-            errDiv.style.display = 'block';
-            errDiv.innerHTML = `⚠️ 시스템 에러 발생:<br>${msg}<br><small>Line: ${line}</small>`;
-            return false;
-        };
-
-        // 데이터 주입 (Python이 이 부분을 실제 데이터로 교체함)
-        const rawData = __DATA_PLACEHOLDER__;
+        // ★★★ 여기가 핵심입니다. 데이터가 바로 주입됩니다. ★★★
+        const rawData = {json_payload};
+        
         let filteredData = [...rawData];
 
-        // 메인 실행 함수 (안전장치 포함)
-        document.addEventListener('DOMContentLoaded', () => {
-            try {
-                console.log("시스템 시작: 데이터 " + rawData.length + "건");
-                
-                // 1. 데이터가 없으면 경고
-                if (!rawData || rawData.length === 0) {
-                    throw new Error("데이터가 0건입니다. CSV 파일을 확인해주세요.");
-                }
+        // 초기화
+        window.onload = function() {{
+            try {{
+                // 로딩 제거
+                document.getElementById('loader').style.display = 'none';
 
-                // 2. 초기화 실행
+                if (!rawData || rawData.length === 0) {{
+                    alert("데이터가 없습니다.");
+                    return;
+                }}
+
                 populateKeywords();
                 updateDashboard();
 
-                // 3. 성공 시 로딩 제거
-                setTimeout(() => {
-                    const loader = document.getElementById('loader');
-                    if(loader) loader.style.display = 'none';
-                }, 500); // 0.5초 뒤 자연스럽게 제거
+            }} catch (err) {{
+                console.error(err);
+                alert("초기화 중 오류가 발생했습니다.");
+            }}
+        }};
 
-            } catch (err) {
-                console.error("초기화 실패:", err);
-                const errDiv = document.getElementById('error-msg');
-                errDiv.style.display = 'block';
-                errDiv.innerHTML = `⚠️ 초기화 실패: ${err.message}`;
-            }
-        });
-
-        // 4. [안전장치] 로딩이 3초 이상 지속되면 강제 종료
-        setTimeout(() => {
-            const loader = document.getElementById('loader');
-            if (loader && loader.style.display !== 'none') {
-                console.warn("로딩 시간 초과 -> 강제 화면 표시");
-                loader.style.display = 'none';
-            }
-        }, 3000);
-
-
-        // --- 기능 구현 ---
-        function populateKeywords() {
+        function populateKeywords() {{
             const select = document.getElementById('filter-keyword');
             const keywords = [...new Set(rawData.map(d => d.keyword))].filter(k => k).sort();
-            keywords.forEach(k => {
+            keywords.forEach(k => {{
                 const opt = document.createElement('option');
                 opt.value = k;
                 opt.textContent = k;
                 select.appendChild(opt);
-            });
-        }
+            }});
+        }}
 
-        function updateDashboard() {
+        function updateDashboard() {{
             const kVal = document.getElementById('filter-keyword').value;
             const sVal = document.getElementById('filter-search').value.toLowerCase();
 
-            filteredData = rawData.filter(item => {
+            filteredData = rawData.filter(item => {{
                 const matchK = kVal === 'all' || item.keyword === kVal;
                 const matchS = item.title.toLowerCase().includes(sVal);
                 return matchK && matchS;
-            });
+            }});
 
             renderKPIs();
             renderList();
             renderChart();
-        }
+        }}
 
-        function renderKPIs() {
-            document.getElementById('total-txt').textContent = filteredData.length;
+        function renderKPIs() {{
             document.getElementById('kpi-total').textContent = filteredData.length;
             document.getElementById('kpi-red').textContent = filteredData.filter(d => d.risk === 'RED').length;
             document.getElementById('kpi-amber').textContent = filteredData.filter(d => d.risk === 'AMBER').length;
             
-            if(filteredData.length > 0) {
-                const counts = {};
+            if(filteredData.length > 0) {{
+                const counts = {{}};
                 filteredData.forEach(d => counts[d.keyword] = (counts[d.keyword]||0)+1);
                 const top = Object.keys(counts).reduce((a,b)=>counts[a]>counts[b]?a:b);
                 document.getElementById('kpi-keyword').textContent = top;
-            } else {
+            }} else {{
                 document.getElementById('kpi-keyword').textContent = "-";
-            }
+            }}
             document.getElementById('list-count').textContent = filteredData.length + "건";
-        }
+        }}
 
-        function renderList() {
+        function renderList() {{
             const container = document.getElementById('news-list');
             container.innerHTML = '';
 
-            if(filteredData.length === 0) {
-                container.innerHTML = '<div class="p-10 text-center border rounded text-slate-400">데이터 없음</div>';
+            if(filteredData.length === 0) {{
+                container.innerHTML = '<div class="p-8 text-center text-slate-400 border rounded">데이터 없음</div>';
                 return;
-            }
+            }}
 
-            filteredData.forEach(item => {
+            filteredData.forEach(item => {{
                 const el = document.createElement('a');
                 el.href = item.link;
                 el.target = '_blank';
@@ -272,58 +249,54 @@ html_template = """
                     <div class="flex justify-between items-start gap-4">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${badge}">${item.risk}</span>
-                                <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border">${item.keyword}</span>
-                                <span class="text-xs text-slate-400 font-mono">${item.date}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${{badge}}">${{item.risk}}</span>
+                                <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border">${{item.keyword}}</span>
+                                <span class="text-xs text-slate-400 font-mono">${{item.date}}</span>
                             </div>
                             <h4 class="font-bold text-base group-hover:text-blue-600 transition-colors leading-snug">
-                                ${item.title}
+                                ${{item.title}}
                             </h4>
                         </div>
                         <i class="ph-bold ph-arrow-square-out text-slate-300 text-lg group-hover:text-blue-500"></i>
                     </div>
                 `;
                 container.appendChild(el);
-            });
-        }
+            }});
+        }}
 
         let myChart = null;
-        function renderChart() {
-            // Chart.js가 로드되지 않았을 경우 대비
-            if (typeof Chart === 'undefined') {
-                console.error("Chart.js 라이브러리 로드 실패");
-                return; 
-            }
+        function renderChart() {{
+            if (typeof Chart === 'undefined') return;
 
-            const counts = {'RED':0, 'AMBER':0, 'GREEN':0};
-            filteredData.forEach(d => {
+            const counts = {{'RED':0, 'AMBER':0, 'GREEN':0}};
+            filteredData.forEach(d => {{
                 if(counts[d.risk]!==undefined) counts[d.risk]++;
                 else counts['GREEN']++;
-            });
+            }});
 
             const ctx = document.getElementById('riskChart').getContext('2d');
             if(myChart) myChart.destroy();
             
-            myChart = new Chart(ctx, {
+            myChart = new Chart(ctx, {{
                 type: 'doughnut',
-                data: {
+                data: {{
                     labels: ['Red', 'Amber', 'Green'],
-                    datasets: [{
+                    datasets: [{{
                         data: [counts['RED'], counts['AMBER'], counts['GREEN']],
                         backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
                         borderWidth: 0
-                    }]
-                },
-                options: {
+                    }}]
+                }},
+                options: {{
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '75%',
-                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } } }
-                }
-            });
-        }
+                    plugins: {{ legend: {{ position: 'right', labels: {{ boxWidth: 10, usePointStyle: true }} }} }}
+                }}
+            }});
+        }}
 
-        // 이벤트 리스너
+        // 리스너
         document.getElementById('filter-keyword').addEventListener('change', updateDashboard);
         document.getElementById('filter-search').addEventListener('input', updateDashboard);
     </script>
@@ -331,13 +304,9 @@ html_template = """
 </html>
 """
 
-# --- [3] 최종 파일 저장 ---
-final_html = html_template.replace('__DATA_PLACEHOLDER__', json_payload)
-
+# --- [4] 파일 저장 ---
 with open(output_filename, 'w', encoding='utf-8') as f:
-    f.write(final_html)
+    f.write(html_content)
 
-print(f"\n✨ 안전장치가 적용된 '{output_filename}' 파일 생성 완료!")
-print("1. 이 파일을 깃허브에 업로드하세요.")
-print("2. 3초가 지나면 로딩 화면이 강제로 사라지며 대시보드가 나타납니다.")
-print("3. 만약 빨간색 에러 메시지가 뜬다면 내용을 알려주세요.")
+print(f"✨ '{output_filename}' 생성 완료!")
+print("데이터가 HTML 안에 완전히 포함되었습니다. 이제 'PLACEHOLDER' 에러가 날 수 없습니다.")
